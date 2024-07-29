@@ -2,11 +2,15 @@ import { useCallback, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import { Connection, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { useQuery } from '@tanstack/react-query';
-
+import { Buffer } from 'buffer';
+import * as borsh from 'borsh';
 
 const LOCAL_RPC_URL = "http://127.0.0.1:8899"
+
+// Change this to the program id of the counter program you deployed
+const COUNTER_PROGRAM_ID = "2cKLoe4iAnBjDWb31oJ9eggLpPW3qCLr8dQ9LdKB7719"
 
 function App() {
   const [count, setCount] = useState(0)
@@ -38,7 +42,7 @@ function App() {
   });
 
   const send1SOL = useCallback(async () => {
-    const provider = getProvider(); // see "Detecting the Provider"
+    const provider = getProvider(); 
     const targetPubkey = "73fCqk4vhrUH3V84Vqf4BMt6ngPhe6dccH5yN5AVwFWw";
     const connection = new Connection(LOCAL_RPC_URL)
     const transaction = new Transaction().add(
@@ -67,6 +71,63 @@ function App() {
     }
   }, [refetch])
 
+  const incrementCounter = useCallback(async () => {
+    const provider = getProvider();
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    const programId = new PublicKey(COUNTER_PROGRAM_ID);
+    // generate new account to store counter
+    const counterAccount = Keypair.generate();
+    console.log("Counter account:", counterAccount.publicKey.toString());
+
+    // create counter account
+    const createCounterAccountInst = SystemProgram.createAccount({
+      fromPubkey: provider.publicKey,
+      newAccountPubkey: counterAccount.publicKey,
+      lamports: await connection.getMinimumBalanceForRentExemption(4), // 4 bytes for counter
+      space: 4,
+      programId: programId
+    });
+    const increment = new Uint8Array(4);
+    new DataView(increment.buffer).setUint32(0, 1, true);
+
+    const incrememtInst = new TransactionInstruction({
+      keys: [
+        { pubkey: counterAccount.publicKey, isSigner: false, isWritable: true },
+        { pubkey: programId, isSigner: false, isWritable: false },
+      ],
+      programId: programId,
+      data: Buffer.from(increment),
+    })
+
+    const transaction = new Transaction().add(createCounterAccountInst, incrememtInst);
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+    } catch (err) {
+      console.log("Error:", err);
+    }
+
+  // Fetch and display the updated counter value
+  const accountInfo = await connection.getAccountInfo(counterAccount.publicKey);
+  console.log("Account info:", accountInfo);
+  if (!accountInfo) {
+    console.log("Account not found");
+    return;
+  }
+  const counterData = borsh.deserialize(
+    CounterSchema,
+    Counter,
+    accountInfo.data
+  );
+
+  console.log('Updated counter value:', counterData?.count);
+  }, [])
+
   return (
     <>
       <div>
@@ -93,6 +154,9 @@ function App() {
           <button onClick={send1SOL}>
             Send 1 SOL
           </button>
+          <button onClick={incrementCounter}>
+            Create account and increment counter
+          </button>
         </div>
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
@@ -118,5 +182,19 @@ const getProvider = () => {
 
   window.open('https://phantom.app/', '_blank');
 };
+
+class Counter {
+  count = 0;
+  constructor(fields = undefined) {
+    if (fields) {
+      // @ts-expect-error no fields
+      this.count = fields.count;
+    }
+  }
+}
+
+const CounterSchema = new Map([
+  [Counter, { kind: "struct", fields: [["count", "u64"]] }]
+])
 
 export default App
