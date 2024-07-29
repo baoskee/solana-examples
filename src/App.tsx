@@ -1,34 +1,41 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import { Connection, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { useQuery } from '@tanstack/react-query';
 
 
 const LOCAL_RPC_URL = "http://127.0.0.1:8899"
 
 function App() {
   const [count, setCount] = useState(0)
-  const [solBalance, setSolBalance] = useState<number>()
+  const { data: provider } = useQuery({
+    queryKey: ['provider'],
+    queryFn: getProvider,
+  });
 
-  useEffect(() => {
-    const connectProvider = async () => {
-      const provider = getProvider(); // see "Detecting the Provider"
-      const connection = new Connection(LOCAL_RPC_URL)
+  const fetchSolBalance = async () => {
+    const provider = getProvider(); // see "Detecting the Provider"
+    const connection = new Connection(LOCAL_RPC_URL)
 
-      try {
-        const resp = await provider.connect();
-        console.log(resp.publicKey.toString());
-        const publicKey = resp.publicKey;
-        const balance = await connection.getBalance(publicKey);
-        setSolBalance(balance / 1e9)
-      } catch (err) {
-        // { code: 4001, message: 'User rejected the request.' }
-      }
-    };
+    try {
+      const resp = await provider.connect();
+      console.log(resp.publicKey.toString());
+      const publicKey = resp.publicKey;
+      const balance = await connection.getBalance(publicKey);
+      return balance / 1e9;
+    } catch (err) {
+      // { code: 4001, message: 'User rejected the request.' }
+      throw new Error('Failed to fetch balance');
+    }
+  };
 
-    connectProvider();
-  }, [])
+  const { data: solBalance, refetch } = useQuery({
+    queryKey: ['solBalance', provider?.publicKey],
+    queryFn: fetchSolBalance,
+    enabled: !!provider,
+  });
 
   const send1SOL = useCallback(async () => {
     const provider = getProvider(); // see "Detecting the Provider"
@@ -54,10 +61,11 @@ function App() {
       const confirmation = await connection.confirmTransaction(signature);
       console.log("Confirmation:", confirmation);
 
+      refetch();
     } catch (err) {
       console.log("Error:", err);
     }
-  }, [])
+  }, [refetch])
 
   return (
     <>
