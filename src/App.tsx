@@ -5,12 +5,15 @@ import './App.css'
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { useQuery } from '@tanstack/react-query';
 import { Buffer } from 'buffer';
-import * as borsh from 'borsh';
 
 const LOCAL_RPC_URL = "http://127.0.0.1:8899"
 
 // Change this to the program id of the counter program you deployed
 const COUNTER_PROGRAM_ID = "2cKLoe4iAnBjDWb31oJ9eggLpPW3qCLr8dQ9LdKB7719"
+
+// Should be owned by the program ID above, and allocated 4 bytes
+// Change this to the counter account you created with Program ID deployed
+const COUNTER_ACCOUNT = "HKc9q4rJVCUSnrYrFEGCYCG79iFdBcniyLFaJ5fC15Ce"
 
 function App() {
   const [count, setCount] = useState(0)
@@ -42,7 +45,7 @@ function App() {
   });
 
   const send1SOL = useCallback(async () => {
-    const provider = getProvider(); 
+    const provider = getProvider();
     const targetPubkey = "73fCqk4vhrUH3V84Vqf4BMt6ngPhe6dccH5yN5AVwFWw";
     const connection = new Connection(LOCAL_RPC_URL)
     const transaction = new Transaction().add(
@@ -71,7 +74,7 @@ function App() {
     }
   }, [refetch])
 
-  const incrementCounter = useCallback(async () => {
+  const deployCounterAccount = useCallback(async () => {
     const provider = getProvider();
     const connection = new Connection(LOCAL_RPC_URL);
 
@@ -88,21 +91,12 @@ function App() {
       space: 4,
       programId: programId
     });
-    const increment = new Uint8Array(4);
-    new DataView(increment.buffer).setUint32(0, 1, true);
 
-    const incrememtInst = new TransactionInstruction({
-      keys: [
-        { pubkey: counterAccount.publicKey, isSigner: false, isWritable: true },
-        { pubkey: programId, isSigner: false, isWritable: false },
-      ],
-      programId: programId,
-      data: Buffer.from(increment),
-    })
-
-    const transaction = new Transaction().add(createCounterAccountInst, incrememtInst);
+    const transaction = new Transaction().add(createCounterAccountInst);
     transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     transaction.feePayer = provider.publicKey;
+    // IMPORTANT: in Solana, you need signature of account you are creating as well as signer
+    transaction.partialSign(counterAccount);
     try {
       const signed = await provider.signTransaction(transaction);
       const signature = await connection.sendRawTransaction(signed.serialize());
@@ -111,22 +105,60 @@ function App() {
     } catch (err) {
       console.log("Error:", err);
     }
-
-  // Fetch and display the updated counter value
-  const accountInfo = await connection.getAccountInfo(counterAccount.publicKey);
-  console.log("Account info:", accountInfo);
-  if (!accountInfo) {
-    console.log("Account not found");
-    return;
-  }
-  const counterData = borsh.deserialize(
-    CounterSchema,
-    Counter,
-    accountInfo.data
-  );
-
-  console.log('Updated counter value:', counterData?.count);
   }, [])
+
+  const { data: counterData, refetch: refetchCounterData } = useQuery({
+    queryKey: ['counterData'],
+    queryFn: async () => {
+      const connection = new Connection(LOCAL_RPC_URL);
+      const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+
+      try {
+        const accountInfo = await connection.getAccountInfo(counterPubkey);
+        if (accountInfo === null) {
+          throw new Error('Error: cannot find the counter account');
+        }
+
+        const counterData = new DataView(accountInfo.data.buffer).getUint32(0, true); // Little-endian
+        console.log("Counter data:", counterData);
+        return counterData;
+      } catch (err) {
+        console.log("Error:", err);
+        throw new Error('Failed to fetch counter data');
+      }
+    },
+  });
+
+  const incrementCounter = useCallback(async () => {
+    // Prepare the instruction data (increment by 1)
+    const increment = new Uint8Array(4);
+    const incrementAmount = 1;
+    new DataView(increment.buffer).setUint32(0, incrementAmount, true); // Little-endian
+
+    const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    // Create the instruction to increment the counter
+    const incrementInstruction = new TransactionInstruction({
+      keys: [{ pubkey: counterPubkey, isSigner: false, isWritable: true }],
+      // only the owner, counter program ID, can update this account
+      programId: new PublicKey(COUNTER_PROGRAM_ID),
+      data: Buffer.from(increment),
+    });
+
+    const transaction = new Transaction().add(incrementInstruction);
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+      refetchCounterData();
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [provider, refetchCounterData])
 
   return (
     <>
@@ -141,7 +173,15 @@ function App() {
       <h1>Vite + React</h1>
       <div className="card">
         <p>
-          SOL Balance: {solBalance}
+          <div>
+            Counter account: {COUNTER_ACCOUNT}
+          </div>
+          <div>
+            SOL Balance: {solBalance}
+          </div>
+          <div>
+            Counter: {counterData}
+          </div>
         </p>
         <div style={{
           display: 'flex',
@@ -154,8 +194,11 @@ function App() {
           <button onClick={send1SOL}>
             Send 1 SOL
           </button>
+          <button onClick={deployCounterAccount}>
+            Deploy counter account
+          </button>
           <button onClick={incrementCounter}>
-            Create account and increment counter
+            Increment counter
           </button>
         </div>
         <p>
@@ -193,7 +236,7 @@ class Counter {
   }
 }
 
-const CounterSchema = new Map([
+export const CounterSchema = new Map([
   [Counter, { kind: "struct", fields: [["count", "u64"]] }]
 ])
 
