@@ -15,6 +15,8 @@ const COUNTER_PROGRAM_ID = "2cKLoe4iAnBjDWb31oJ9eggLpPW3qCLr8dQ9LdKB7719"
 // Change this to the counter account you created with Program ID deployed
 const COUNTER_ACCOUNT = "HKc9q4rJVCUSnrYrFEGCYCG79iFdBcniyLFaJ5fC15Ce"
 
+const CPI_PROGRAM_ID = "3keLrJBrHdo25govPxiNRmFUs5YmxvXQghCkdEmwCNFX"
+
 function App() {
   const [count, setCount] = useState(0)
   const { data: provider } = useQuery({
@@ -160,6 +162,38 @@ function App() {
     }
   }, [provider, refetchCounterData])
 
+  const cpiIncrementBy7 = useCallback(async () => {
+    const provider = getProvider();
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    const cpiExamplePubkey = new PublicKey(CPI_PROGRAM_ID);
+    const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+    const counterProgram = new PublicKey(COUNTER_PROGRAM_ID);  
+
+    const cpiInstruction = new TransactionInstruction({
+      keys: [
+        // IMPORTANT: must include counter program account as first element
+        { pubkey: counterPubkey, isSigner: false, isWritable: true },
+        { pubkey: counterProgram, isSigner: false, isWritable: false },
+      ],
+      programId: cpiExamplePubkey,
+      data: Buffer.from([])
+    })
+
+    const tx = new Transaction().add(cpiInstruction)
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+      refetchCounterData()
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [refetchCounterData])
+
   return (
     <>
       <div>
@@ -199,6 +233,9 @@ function App() {
           </button>
           <button onClick={incrementCounter}>
             Increment counter
+          </button>
+          <button onClick={cpiIncrementBy7}>
+            Call CPI contract (Increment by 7)
           </button>
         </div>
         <p>
