@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from "@solana/web3.js";
 import { useCallback, useState } from "react";
-import * as borsh from "borsh";
-import { Buffer } from "buffer";
+import { BorshSchema, borshSerialize, borshDeserialize } from 'borsher';
 
 const LOCAL_RPC_URL = "http://127.0.0.1:8899"
 const PROGRAM_ID = "7VfV44AdkrFskByeVabzDxfeJxjUtA1nAFxdgoERSSJR";
@@ -18,15 +17,6 @@ function App() {
       console.log("pda, bump", pda, bump);
       return pda;
     },
-  });
-  const pda_exists = useQuery({
-    queryKey: ["pda_exists", pda_data_account.data],
-    queryFn: async () => {
-      const connection = new Connection(LOCAL_RPC_URL);
-      const accountInfo = await connection.getAccountInfo(pda_data_account.data!);
-      return accountInfo !== null;
-    },
-    enabled: !!pda_data_account.data,
   });
 
   const [data_account, set_data_account] = useState<string>();
@@ -58,31 +48,48 @@ function App() {
         }
       ],
       programId,
-      data: Buffer.from(borsh.serialize(
-        // @ts-expect-error what 
-        schema,
-        Instruction.initialize(new PublicKey(AUTHORIZED_ADDR))
-      ))
+      data: borshSerialize(instructionSchema, {
+        Initialize: {
+          address: new PublicKey(AUTHORIZED_ADDR).toBuffer() 
+        }
+      })
     })
 
     const tx = new Transaction().add(createAccountInst, instantiateInst);
     tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
     tx.feePayer = provider.publicKey;
     tx.partialSign(counterKeypair);
-    set_data_account(counterKeypair.publicKey.toBase58());
     try {
       const signed = await provider.signTransaction(tx);
       const signature = await connection.sendRawTransaction(signed.serialize());
       const confirmation = await connection.confirmTransaction(signature);
       console.log("Confirmation:", confirmation);
-      pda_exists.refetch();
+      set_data_account(counterKeypair.publicKey.toBase58());
     } catch (err) {
       console.log("Error:", err);
     }
   }, [
-    pda_exists,
+    set_data_account,
     pda_data_account.data,
   ]);
+
+  const incrementDataAccount = useQuery({
+    queryKey: ["increment_data_account", data_account],
+    queryFn: async () => {
+      if (!data_account) return;
+
+      // get state of data account
+      const connection = new Connection(LOCAL_RPC_URL);
+      const accountInfo = await connection.getAccountInfo(new PublicKey(data_account));
+      if (accountInfo === null) {
+        throw new Error('Error: cannot find the counter account');
+      } 
+
+      const data: { count: number } = await borshDeserialize(stateSchema, accountInfo.data)
+      return data.count as number
+    },
+    enabled: !!data_account
+  })
 
   const increment = useCallback(async () => {
     if (!data_account) return;
@@ -98,35 +105,46 @@ function App() {
           pubkey: counterPubkey,
           isSigner: false,
           isWritable: true,
+        },
+        // Authorized address
+        {
+          pubkey: new PublicKey(AUTHORIZED_ADDR),
+          // toggle this to error
+          // @todo for some reason, false does not error
+          isSigner: false,
+          isWritable: false,
         }
       ],
       programId,
-      data: Buffer.from(borsh.serialize(
-        // @ts-expect-error what 
-        schema,
-        Instruction.increment(1)
-      ))
+      data: borshSerialize(instructionSchema, {
+        Increment: {
+          increment: 1
+        }
+      })
     });
 
     const tx = new Transaction().add(instruction);
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = provider.publicKey;
     try {
       const signed = await provider.signTransaction(tx);
       const signature = await connection.sendRawTransaction(signed.serialize());
       const confirmation = await connection.confirmTransaction(signature);
       console.log("Confirmation:", confirmation);
+      incrementDataAccount.refetch()
     } catch (err) {
       console.log("Error:", err);
     }
-  }, [data_account]);
+  }, [data_account, incrementDataAccount]);
 
   return (<div className="h-screen w-screen">
-    <div className="flex w-full justify-center items-center h-full">
+    <div className="flex w-full justify-center items-center h-full flex-col gap-2">
 
       {data_account ? <p>account exists on chain: {data_account}</p> : <button onClick={deployDataAccount}>Deploy data account</button>}
       {data_account &&
         <button onClick={increment}>Increment</button>
       }
-
+      {incrementDataAccount.data && <p>count: {incrementDataAccount.data}</p>}
     </div>
   </div>)
 }
@@ -147,46 +165,16 @@ const getProvider = () => {
   window.open('https://phantom.app/', '_blank');
 };
 
-// Define the instruction enum structure
-enum InstructionType {
-  Initialize,
-  Increment,
-}
+const instructionSchema = BorshSchema.Enum({
+  Initialize: BorshSchema.Struct({
+    address: BorshSchema.Array(BorshSchema.u8, 32)
+  }),
+  Increment: BorshSchema.Struct({
+    increment: BorshSchema.u32
+  })
+})
 
-class Instruction {
-  static initialize(address: PublicKey): InitializeInstruction {
-    return new InitializeInstruction(address);
-  }
-
-  static increment(increment: number): IncrementInstruction {
-    return new IncrementInstruction(increment);
-  }
-}
-
-class InitializeInstruction {
-  instruction = InstructionType.Initialize;
-  address: Uint8Array;
-
-  constructor(address: PublicKey) {
-    this.address = address.toBytes();
-  }
-}
-
-class IncrementInstruction {
-  instruction = InstructionType.Increment;
-  increment: number;
-
-  constructor(increment: number) {
-    this.increment = increment;
-  }
-}
-
-// Define the schema for Borsh serialization
-const schema = new Map([
-  [Instruction, {
-    kind: 'enum', field: 'instruction', values: new Map([
-      [InstructionType.Initialize, ['InitializeInstruction']],
-      [InstructionType.Increment, ['IncrementInstruction']],
-    ])
-  }]
-]);
+const stateSchema = BorshSchema.Struct({
+  count: BorshSchema.u32,
+  address: BorshSchema.Array(BorshSchema.u8, 32)
+})

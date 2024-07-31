@@ -17,6 +17,9 @@ importers:
       borsh:
         specifier: ^2.0.0
         version: 2.0.0
+      borsher:
+        specifier: ^3.5.0
+        version: 3.5.0
       buffer:
         specifier: ^6.0.3
         version: 6.0.3
@@ -682,6 +685,9 @@ packages:
 
   borsh@2.0.0:
     resolution: {integrity: sha512-kc9+BgR3zz9+cjbwM8ODoUB4fs3X3I5A/HtX7LZKxCLaMrEeDFoBpnhZY//DTS1VZBSs6S5v46RZRbZjRFspEg==}
+
+  borsher@3.5.0:
+    resolution: {integrity: sha512-53UlE2ukArKGrw3u+MKR5CBqYR+Fr47tGAeIRmAy+W5G6FMRnoM7G8mHYFeijGyhKje5aaQTCqZu/hugQ2HiBA==}
 
   brace-expansion@1.1.11:
     resolution: {integrity: sha512-iCuPHDFgrHX7H2vEI/5xpz07zSHB00TpugqhmYtVmMO6518mCuRMoOYFldEBl0g187ufozdaHgWKcYFb61qGiA==}
@@ -2213,6 +2219,11 @@ snapshots:
       text-encoding-utf-8: 1.0.2
 
   borsh@2.0.0: {}
+
+  borsher@3.5.0:
+    dependencies:
+      borsh: 2.0.0
+      buffer: 6.0.3
 
   brace-expansion@1.1.11:
     dependencies:
