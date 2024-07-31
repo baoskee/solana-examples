@@ -10,5 +10,5 @@ borsh = "1.5.1"
 solana-program = "=1.18.18"
 
 [lib]
-name = "addr-gating"
+name = "addr_gating_counter"
 crate-type = ["cdylib", "lib"]

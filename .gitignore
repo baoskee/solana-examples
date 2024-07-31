@@ -26,3 +26,4 @@ dist-ssr
 # rust 
 counter-program/target
 cpi-example/target
+addr-gating-counter/target
