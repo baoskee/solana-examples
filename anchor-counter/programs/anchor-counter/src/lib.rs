@@ -3,12 +3,12 @@ use anchor_lang::prelude::*;
 declare_id!("8rK93pjtsMfxvLayRD8Ypa9YJCursWoCT7379KTJtzxb");
 
 #[program]
-pub mod simple_counter {
+pub mod anchor_counter {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, data: Option<u64>) -> Result<()> {
         let counter = &mut ctx.accounts.counter;
-        counter.count = 0;
+        counter.count = data.unwrap_or(0);
         Ok(())
     }
 
@@ -29,8 +29,9 @@ pub mod simple_counter {
 pub struct Initialize<'info> {
     #[account(init, payer = user, space = 8 + 8)]
     pub counter: Account<'info, Counter>,
+    #[account(mut)]
     pub user: Signer<'info>,
-    pub system_program: AccountInfo<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
