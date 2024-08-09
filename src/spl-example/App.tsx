@@ -9,8 +9,8 @@ import {
 import "../index.css"
 import { useCallback, useState } from "react"
 import { LOCAL_RPC_URL } from "../lib/constants";
-import { getProvider } from "../lib/util";
-import { createInitializeMint2Instruction, getMinimumBalanceForRentExemptMint, getMint, MINT_SIZE, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { getProvider, signAndBroadcast } from "../lib/util";
+import { createAssociatedTokenAccountInstruction, createInitializeMint2Instruction, getAssociatedTokenAddress, getMinimumBalanceForRentExemptMint, getMint, MINT_SIZE, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { useQuery } from "@tanstack/react-query";
 
 const DEFAULT_MINT = 'HRHCBGxwW7Qb6KU9GcnwR32vQ8wu5m1N8pzyqvaTcAq4';
@@ -77,13 +77,47 @@ function App() {
     refetchMintAccount();
   }, [refetchMintAccount]);
 
-  return <div className="h-screen w-screen items-center justify-center flex flex-col">
+  const [tokenAccount, setTokenAccount] = useState<string | null>(null);
+  const createTokenAccount = useCallback(async () => {
+    if (!mint) return;
+
+    const connection = new Connection(LOCAL_RPC_URL);
+    const provider = getProvider();
+    await provider.connect();
+    const ata = await getAssociatedTokenAddress(
+      new PublicKey(mint), // mint
+      provider.publicKey, // token account owner
+      true,
+      TOKEN_2022_PROGRAM_ID
+    );
+    const transaction = new Transaction().add(
+      createAssociatedTokenAccountInstruction(
+        provider.publicKey,
+        ata,
+        provider.publicKey,
+        new PublicKey(mint),
+        TOKEN_2022_PROGRAM_ID
+      )
+    );
+    const res = await signAndBroadcast(connection, provider, transaction);
+    console.log('res', res);
+
+    setTokenAccount(ata.toBase58());
+  }, [mint]);
+
+  return <div className="h-screen w-screen items-center justify-center flex flex-col gap-2">
     {mint && <div>
       <p>Mint address: {mint}</p>
       <div>Mint account: <pre className="text-xs">{stringifyBigInt(mintAccount)}</pre></div>
+      <div>Token account:{tokenAccount}</div>
+
+  
     </div>}
+    {mint && <button onClick={createTokenAccount}>
+      Create new token account
+    </button>}
     <button onClick={createTokenMintAccount}>
-      Create token mint account
+      Create new token mint account
     </button>
   </div>
 }
