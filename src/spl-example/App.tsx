@@ -10,7 +10,7 @@ import "../index.css"
 import { useCallback, useState } from "react"
 import { LOCAL_RPC_URL } from "../lib/constants";
 import { getProvider, signAndBroadcast } from "../lib/util";
-import { createAssociatedTokenAccountInstruction, createInitializeMint2Instruction, getAccount, getAssociatedTokenAddress, getMinimumBalanceForRentExemptMint, getMint, MINT_SIZE, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { createAssociatedTokenAccountInstruction, createInitializeMint2Instruction, createMintToCheckedInstruction, getAccount, getAssociatedTokenAddress, getMinimumBalanceForRentExemptMint, getMint, MINT_SIZE, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { useQuery } from "@tanstack/react-query";
 
 const DEFAULT_MINT = 'HRHCBGxwW7Qb6KU9GcnwR32vQ8wu5m1N8pzyqvaTcAq4';
@@ -96,6 +96,16 @@ function App() {
     },
     enabled: !!mint,
   })
+  const tokenAcccountBalance = useQuery({
+    queryKey: ['tokenAcccountBalance', mint],
+    queryFn: async () => {
+      const conn = new Connection(LOCAL_RPC_URL);
+      return await conn.getTokenAccountBalance(
+        tokenAccount.data!.address
+      );
+    },
+    enabled: !!mint && !!tokenAccount.data,
+  });
   const createTokenAccount = useCallback(async () => {
     if (!mint) return;
 
@@ -123,14 +133,40 @@ function App() {
     tokenAccount.refetch();
   }, [mint, tokenAccount]);
 
+  const mintTokens = useCallback(async () => {
+    if (!mint) return;
+    const provider = getProvider();
+    await provider.connect();
+
+    const connection = new Connection(LOCAL_RPC_URL);
+    const tx = new Transaction().add(
+      createMintToCheckedInstruction(
+        new PublicKey(mint),
+        tokenAccount.data!.address, // receiver
+        provider.publicKey, // mint authority
+        1e8,
+        8,
+        [],
+        TOKEN_2022_PROGRAM_ID
+      )
+    );
+
+    const res = await signAndBroadcast(connection, provider, tx);
+    console.log('res', res);
+    tokenAcccountBalance.refetch();
+  }, [mint, tokenAccount.data, tokenAcccountBalance]);
+
   return <div className="h-screen w-screen items-center justify-center flex flex-col gap-2">
     {mint && <div>
       <p>Mint address: {mint}</p>
       <div>Mint account: <pre className="text-xs">{stringifyBigInt(mintAccount)}</pre></div>
       <div>Token account: <pre className="text-xs">{stringifyBigInt(tokenAccount.data)}</pre></div>
-
+      <div>Token account balance: {tokenAcccountBalance?.data?.value.uiAmount}</div>
   
     </div>}
+    {tokenAccount.data && <button onClick={mintTokens}>
+      Mint 1000 tokens to wallet
+    </button>}
     {mint && <button onClick={createTokenAccount}>
       Create new token account
     </button>}
