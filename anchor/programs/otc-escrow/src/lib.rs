@@ -7,13 +7,14 @@ declare_id!("2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT");
 pub mod escrow {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, id_seed: u64) -> Result<()> {
         msg!("Greetings from: {:?}", ctx.program_id);
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(id_seed: u64)]
 pub struct Initialize<'info> {
     // mutable because we are taking funds from the maker
     #[account(mut)]
@@ -37,8 +38,7 @@ pub struct Initialize<'info> {
     #[account(
         mut,
         associated_token::mint = token_mint_maker,
-        // @todo what should be the authority for a contract-controlled ATA?
-        associated_token::authority = maker,
+        associated_token::authority = otc_offer,
         associated_token::token_program = token_program
     )]
     pub contract_token_account_maker: Account<'info, TokenAccount>,
@@ -47,6 +47,9 @@ pub struct Initialize<'info> {
         init, 
         payer = maker,
         space = 8 + OtcOffer::INIT_SPACE,
+        // we're using the otc_offer account as the ATA authority for contract
+        seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
+        bump
     )] 
     pub otc_offer: Account<'info, OtcOffer>,
 
@@ -64,4 +67,9 @@ pub struct OtcOffer {
     pub token_maker_amount: u64,
     pub token_mint_taker: Pubkey,
     pub token_taker_amount: u64,
+
+    // seed and bump used for PDA derivation
+    // makes for 2**64 possible offers given the same maker address
+    pub id_seed: u64,
+    pub bump: u8,
 }
