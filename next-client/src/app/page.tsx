@@ -246,17 +246,3 @@ const getProvider = () => {
 
   window.open('https://phantom.app/', '_blank');
 };
-
-class Counter {
-  count = 0;
-  constructor(fields = undefined) {
-    if (fields) {
-      // @ts-expect-error no fields
-      this.count = fields.count;
-    }
-  }
-}
-
-export const CounterSchema = new Map([
-  [Counter, { kind: "struct", fields: [["count", "u64"]] }]
-])
