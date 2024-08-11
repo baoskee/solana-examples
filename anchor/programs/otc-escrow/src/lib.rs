@@ -43,6 +43,7 @@ pub mod escrow {
             token_maker_amount,
             token_mint_taker: ctx.accounts.token_mint_taker.key(),
             token_taker_amount: token_taker_amount_wanted,
+            // notice client will provide id and bump for PDA 
             id_seed,
             bump: ctx.bumps.otc_offer,
         });
@@ -106,8 +107,12 @@ pub struct OtcOffer {
     pub token_mint_taker: Pubkey,
     pub token_taker_amount: u64,
 
-    // seed and bump used for PDA derivation
+    // `id_seed` is an input to derive the PDA seed
     // makes for 2**64 possible offers given the same maker address
-    pub id_seed: u64,
+    // IMPORTANT: `id_seed` allows maker to have multiple offers at the same time
+    // ```
+    // seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
+    // ```
+    pub id_seed: u64, 
     pub bump: u8,
 }
