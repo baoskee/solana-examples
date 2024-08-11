@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::{associated_token::AssociatedToken, token::{Mint, Token, TokenAccount}};
 
 declare_id!("2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT");
 
@@ -117,6 +117,7 @@ pub struct Initialize<'info> {
     pub token_mint_b: Account<'info, Mint>,
 
     #[account(
+        // @improvement: add init_if_needed constraint 
         mut,
         associated_token::mint = token_mint_a,
         associated_token::authority = maker,
@@ -125,7 +126,11 @@ pub struct Initialize<'info> {
     pub token_account_maker: Account<'info, TokenAccount>,
 
     #[account(
-        mut,
+        // it's complicated create this client-side since you have to use the 
+        // seeds for `otc_offer` below to point the authority to `otc_offer`.
+        // just let Anchor create this account
+        init,
+        payer = maker,
         associated_token::mint = token_mint_a,
         associated_token::authority = otc_offer,
         associated_token::token_program = token_program
@@ -145,6 +150,9 @@ pub struct Initialize<'info> {
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
+    // this is needed for `contract_token_account` since we are initializing 
+    // a TokenAccount for the contract
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
 #[derive(InitSpace)]

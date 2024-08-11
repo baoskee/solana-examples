@@ -10,7 +10,7 @@ import { sign } from "crypto";
 // Fill out your params here
 const TOKEN_MINT_A = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
 const TOKEN_MINT_A_AMOUNT = 100
-const TOKEN_MINT_B = "Ekxo7ZXy5QgStoSeLsoAjcP14as1YeyKT83eziPdFcWh"
+const TOKEN_MINT_B = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
 const TOKEN_MINT_B_AMOUNT = 200
 const TAKER = "HNc5mQKb5X7Agsk866kxM1yLv6dVDTPJnuPSsanGhrFo"
 

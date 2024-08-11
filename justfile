@@ -32,3 +32,6 @@ transfer token_addr amount recipient:
   spl-token create-account {{token_addr}} --owner {{recipient}} \
     --fee-payer {{keypair_path}} 2>/dev/null || true 
   spl-token transfer {{token_addr}} {{amount}} {{recipient}} 
+
+ata token wallet: 
+  spl-token address --token {{token}} --owner {{wallet}} --verbose
