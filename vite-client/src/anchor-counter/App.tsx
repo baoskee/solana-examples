@@ -2,8 +2,8 @@ import { Connection, Keypair } from "@solana/web3.js";
 import { useCallback, useState } from "react";
 import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
-import { AnchorCounter } from "../../anchor/target/types/anchor_counter"
-import IDL from "../../anchor/target/idl/anchor_counter.json"
+import { AnchorCounter } from "../../../anchor/target/types/anchor_counter"
+import IDL from "../../../anchor/target/idl/anchor_counter.json"
 import { useQuery } from "@tanstack/react-query";
 
 const LOCAL_RPC_URL = "http://127.0.0.1:8899"
