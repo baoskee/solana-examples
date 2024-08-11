@@ -129,14 +129,52 @@ pub struct Claim<'info> {
     #[account(mut)]
     pub taker: Signer<'info>,
 
+    // @todo does the maker need to be mutable? I thought only its TokenAccount is mutable
+    // we need to pass maker in because token_b will be transferred (mutated)
+    #[account(mut)]
+    pub maker: SystemAccount<'info>,
+
     pub token_mint_a: Account<'info, Mint>,
     pub token_mint_b: Account<'info, Mint>,
 
     #[account(
-        mut,
+        constraint = otc_offer.maker == maker.key(),
         constraint = otc_offer.taker == taker.key(),
         constraint = otc_offer.token_mint_a == token_mint_a.key(),
-        constraint = otc_offer.token_mint_b == token_mint_b.key()
+        constraint = otc_offer.token_mint_b == token_mint_b.key(),
+        // note init is not a constraint, so this just verifies that account passed in
+        // is the correct PDA
+        seeds = [b"otc_offer", otc_offer.maker.key().as_ref(), otc_offer.id_seed.to_le_bytes().as_ref()],
+        bump = otc_offer.bump,
     )]
     pub otc_offer: Account<'info, OtcOffer>,
+
+    // needs taker account for token b (for transfer to a)
+    #[account(
+        mut,
+        associated_token::mint = token_mint_b,
+        associated_token::authority = taker,
+        associated_token::token_program = token_program
+    )]
+    pub token_account_taker_b: Account<'info, TokenAccount>,
+
+    // needs maker account for token b (for taker to transfer to)
+    #[account(
+        mut,
+        associated_token::mint = token_mint_b,
+        associated_token::authority = maker,
+        associated_token::token_program = token_program
+    )]
+    pub token_account_maker_b: Account<'info, TokenAccount>,
+
+    // needs taker account for token a (for contract to transfer to taker)
+    #[account(
+        mut,
+        associated_token::mint = token_mint_a,
+        associated_token::authority = taker,
+        associated_token::token_program = token_program
+    )]
+    pub token_account_taker_a: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
 }
