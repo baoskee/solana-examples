@@ -23,5 +23,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "anchor-counter/target/types/anchor_counter.ts"]
+  "include": ["src", "anchor/target/types/anchor_counter.ts"]
 }
