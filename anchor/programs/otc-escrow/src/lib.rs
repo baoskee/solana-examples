@@ -5,10 +5,48 @@ declare_id!("2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT");
 
 #[program]
 pub mod escrow {
+    use anchor_spl::token::{transfer_checked, TransferChecked};
+
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, id_seed: u64) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
+    pub fn initialize(
+        ctx: Context<Initialize>, 
+        id_seed: u64,
+        token_maker_amount: u64,
+        token_taker_amount_wanted: u64, 
+        taker: Pubkey,
+    ) -> Result<()> {
+        // 1. transfer the tokens from the maker to the contract_token_account  
+        let transfer_accounts = TransferChecked {
+            from: ctx.accounts.token_account_maker.to_account_info(),
+            mint: ctx.accounts.token_mint_maker.to_account_info(),
+            to: ctx.accounts.contract_token_account.to_account_info(),
+            authority: ctx.accounts.maker.to_account_info(),
+        };
+
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            transfer_accounts,
+        );
+
+        transfer_checked(
+            cpi_context,
+            token_maker_amount,
+            ctx.accounts.token_mint_maker.decimals,
+        )?;
+
+        // 2. initialize the otc_offer account
+        ctx.accounts.otc_offer.set_inner(OtcOffer {
+            maker: ctx.accounts.maker.key(),
+            taker,
+            token_mint_maker: ctx.accounts.token_mint_maker.key(),
+            token_maker_amount,
+            token_mint_taker: ctx.accounts.token_mint_taker.key(),
+            token_taker_amount: token_taker_amount_wanted,
+            id_seed,
+            bump: ctx.bumps.otc_offer,
+        });
+
         Ok(())
     }
 }
@@ -41,7 +79,7 @@ pub struct Initialize<'info> {
         associated_token::authority = otc_offer,
         associated_token::token_program = token_program
     )]
-    pub contract_token_account_maker: Account<'info, TokenAccount>,
+    pub contract_token_account: Account<'info, TokenAccount>,
 
     #[account(
         init, 
