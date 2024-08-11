@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 declare_id!("2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT");
 
@@ -15,13 +15,33 @@ pub mod escrow {
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
+    // mutable because we are taking funds from the maker
     #[account(mut)]
     pub maker: Signer<'info>,
-    // address of the taker. Only the taker can claim the tokens.
-    pub taker: UncheckedAccount<'info>,
 
-    pub token_mint_maker: Account<'info, Mint>, 
+    // we have to make sure that these are valid SPL mint accounts
+    #[account(mint::token_program = token_program)]
+    pub token_mint_maker: Account<'info, Mint>,
+
+    #[account(mint::token_program = token_program)]
     pub token_mint_taker: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = token_mint_maker,
+        associated_token::authority = maker,
+        associated_token::token_program = token_program
+    )]
+    pub token_account_maker: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::mint = token_mint_maker,
+        // @todo what should be the authority for a contract-controlled ATA?
+        associated_token::authority = maker,
+        associated_token::token_program = token_program
+    )]
+    pub contract_token_account_maker: Account<'info, TokenAccount>,
 
     #[account(
         init, 
@@ -31,7 +51,6 @@ pub struct Initialize<'info> {
     pub otc_offer: Account<'info, OtcOffer>,
 
     pub system_program: Program<'info, System>,
-    // @wip Why do we need this?
     pub token_program: Program<'info, Token>,
 }
 
@@ -39,6 +58,7 @@ pub struct Initialize<'info> {
 #[account]
 pub struct OtcOffer {
     pub maker: Pubkey,
+    // address of the taker. Only the taker can claim the tokens.
     pub taker: Pubkey,
     pub token_mint_maker: Pubkey,
     pub token_maker_amount: u64,
