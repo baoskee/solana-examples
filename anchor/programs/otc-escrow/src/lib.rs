@@ -39,11 +39,11 @@ pub mod escrow {
         ctx.accounts.otc_offer.set_inner(OtcOffer {
             maker: ctx.accounts.maker.key(),
             taker,
-            token_mint_maker: ctx.accounts.token_mint_a.key(),
+            token_mint_a: ctx.accounts.token_mint_a.key(),
             token_maker_amount,
-            token_mint_taker: ctx.accounts.token_mint_b.key(),
+            token_mint_b: ctx.accounts.token_mint_b.key(),
             token_taker_amount: token_taker_amount_wanted,
-            // notice client will provide id and bump for PDA 
+            // notice client will provide id but the bump is calculated by Anchor
             id_seed,
             bump: ctx.bumps.otc_offer,
         });
@@ -91,6 +91,7 @@ pub struct Initialize<'info> {
         payer = maker,
         space = 8 + OtcOffer::INIT_SPACE,
         // we're using the otc_offer account as the ATA authority for contract
+        // this creates a PDA for the otc_offer account with the following seeds
         seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
         bump
     )] 
@@ -106,9 +107,9 @@ pub struct OtcOffer {
     pub maker: Pubkey,
     // address of the taker. Only the taker can claim the tokens.
     pub taker: Pubkey,
-    pub token_mint_maker: Pubkey,
+    pub token_mint_a: Pubkey,
     pub token_maker_amount: u64,
-    pub token_mint_taker: Pubkey,
+    pub token_mint_b: Pubkey,
     pub token_taker_amount: u64,
 
     // `id_seed` is an input to derive the PDA seed
@@ -118,11 +119,24 @@ pub struct OtcOffer {
     // seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
     // ```
     pub id_seed: u64, 
-    pub bump: u8,
+    pub bump: u8, 
+    // anchor does not store bump automatically... 
+    // so we have to manually store it in Initialize
 }
 
 #[derive(Accounts)]
 pub struct Claim<'info> {
     #[account(mut)]
     pub taker: Signer<'info>,
+
+    pub token_mint_a: Account<'info, Mint>,
+    pub token_mint_b: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        constraint = otc_offer.taker == taker.key(),
+        constraint = otc_offer.token_mint_a == token_mint_a.key(),
+        constraint = otc_offer.token_mint_b == token_mint_b.key()
+    )]
+    pub otc_offer: Account<'info, OtcOffer>,
 }
