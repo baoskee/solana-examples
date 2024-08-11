@@ -1,113 +1,262 @@
-import Image from "next/image";
+"use client"
+import { useCallback, useState } from 'react'
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { useQuery } from '@tanstack/react-query';
+import { Buffer } from 'buffer';
 
-export default function Home() {
+const LOCAL_RPC_URL = "http://127.0.0.1:8899"
+
+// Change this to the program id of the counter program you deployed
+const COUNTER_PROGRAM_ID = "2cKLoe4iAnBjDWb31oJ9eggLpPW3qCLr8dQ9LdKB7719"
+
+// Should be owned by the program ID above, and allocated 4 bytes
+// Change this to the counter account you created with Program ID deployed
+const COUNTER_ACCOUNT = "HKc9q4rJVCUSnrYrFEGCYCG79iFdBcniyLFaJ5fC15Ce"
+
+const CPI_PROGRAM_ID = "3keLrJBrHdo25govPxiNRmFUs5YmxvXQghCkdEmwCNFX"
+
+export default function App() {
+  const [count, setCount] = useState(0)
+  const { data: provider } = useQuery({
+    queryKey: ['provider'],
+    queryFn: getProvider,
+  });
+
+  const fetchSolBalance = async () => {
+    const provider = getProvider(); // see "Detecting the Provider"
+    const connection = new Connection(LOCAL_RPC_URL)
+
+    try {
+      const resp = await provider.connect();
+      console.log(resp.publicKey.toString());
+      const publicKey = resp.publicKey;
+      const balance = await connection.getBalance(publicKey);
+      return balance / 1e9;
+    } catch (err) {
+      // { code: 4001, message: 'User rejected the request.' }
+      throw new Error('Failed to fetch balance');
+    }
+  };
+
+  const { data: solBalance, refetch } = useQuery({
+    queryKey: ['solBalance', provider?.publicKey],
+    queryFn: fetchSolBalance,
+    enabled: !!provider,
+  });
+
+  const send1SOL = useCallback(async () => {
+    const provider = getProvider();
+    const targetPubkey = "73fCqk4vhrUH3V84Vqf4BMt6ngPhe6dccH5yN5AVwFWw";
+    const connection = new Connection(LOCAL_RPC_URL)
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: provider.publicKey,
+        lamports: 1e9,
+        toPubkey: new PublicKey(targetPubkey)
+      })
+    );
+
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(transaction);
+      console.log("Signed:", signed);
+
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      console.log("Signature:", signature);
+
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+
+      refetch();
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [refetch])
+
+  const deployCounterAccount = useCallback(async () => {
+    const provider = getProvider();
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    const programId = new PublicKey(COUNTER_PROGRAM_ID);
+    // generate new account to store counter
+    const counterAccount = Keypair.generate();
+    console.log("Counter account:", counterAccount.publicKey.toString());
+
+    // create counter account
+    const createCounterAccountInst = SystemProgram.createAccount({
+      fromPubkey: provider.publicKey,
+      newAccountPubkey: counterAccount.publicKey,
+      lamports: await connection.getMinimumBalanceForRentExemption(4), // 4 bytes for counter
+      space: 4,
+      programId: programId
+    });
+
+    const transaction = new Transaction().add(createCounterAccountInst);
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = provider.publicKey;
+    // IMPORTANT: in Solana, you need signature of account you are creating as well as signer
+    transaction.partialSign(counterAccount);
+    try {
+      const signed = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [])
+
+  const { data: counterData, refetch: refetchCounterData } = useQuery({
+    queryKey: ['counterData'],
+    queryFn: async () => {
+      const connection = new Connection(LOCAL_RPC_URL);
+      const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+
+      try {
+        const accountInfo = await connection.getAccountInfo(counterPubkey);
+        if (accountInfo === null) {
+          throw new Error('Error: cannot find the counter account');
+        }
+
+        const counterData = new DataView(accountInfo.data.buffer).getUint32(0, true); // Little-endian
+        console.log("Counter data:", counterData);
+        return counterData;
+      } catch (err) {
+        console.log("Error:", err);
+        throw new Error('Failed to fetch counter data');
+      }
+    },
+  });
+
+  const incrementCounter = useCallback(async () => {
+    // Prepare the instruction data (increment by 1)
+    const increment = new Uint8Array(4);
+    const incrementAmount = 1;
+    new DataView(increment.buffer).setUint32(0, incrementAmount, true); // Little-endian
+
+    const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    // Create the instruction to increment the counter
+    const incrementInstruction = new TransactionInstruction({
+      keys: [{ pubkey: counterPubkey, isSigner: false, isWritable: true }],
+      // only the owner, counter program ID, can update this account
+      programId: new PublicKey(COUNTER_PROGRAM_ID),
+      data: Buffer.from(increment),
+    });
+
+    const transaction = new Transaction().add(incrementInstruction);
+    transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    transaction.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+      refetchCounterData();
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [provider, refetchCounterData])
+
+  const cpiIncrementBy7 = useCallback(async () => {
+    const provider = getProvider();
+    const connection = new Connection(LOCAL_RPC_URL);
+
+    const cpiExamplePubkey = new PublicKey(CPI_PROGRAM_ID);
+    const counterPubkey = new PublicKey(COUNTER_ACCOUNT);
+    const counterProgram = new PublicKey(COUNTER_PROGRAM_ID);  
+
+    const cpiInstruction = new TransactionInstruction({
+      keys: [
+        // IMPORTANT: must include counter program account as first element
+        { pubkey: counterPubkey, isSigner: false, isWritable: true },
+        { pubkey: counterProgram, isSigner: false, isWritable: false },
+      ],
+      programId: cpiExamplePubkey,
+      data: Buffer.from([])
+    })
+
+    const tx = new Transaction().add(cpiInstruction)
+    tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+    tx.feePayer = provider.publicKey;
+    try {
+      const signed = await provider.signTransaction(tx);
+      const signature = await connection.sendRawTransaction(signed.serialize());
+      const confirmation = await connection.confirmTransaction(signature);
+      console.log("Confirmation:", confirmation);
+      refetchCounterData()
+    } catch (err) {
+      console.log("Error:", err);
+    }
+  }, [refetchCounterData])
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:size-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <>
+      <div className="card">
+        <div>
+          <div>
+            Counter account: {COUNTER_ACCOUNT}
+          </div>
+          <div>
+            SOL Balance: {solBalance}
+          </div>
+          <div>
+            Counter: {counterData}
+          </div>
         </div>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'row',
+          gap: '10px'
+        }}>
+          <button onClick={() => setCount((count) => count + 1)}>
+            count is {count}
+          </button>
+          <button onClick={send1SOL}>
+            Send 1 SOL
+          </button>
+          <button onClick={deployCounterAccount}>
+            Deploy counter account
+          </button>
+          <button onClick={incrementCounter}>
+            Increment counter
+          </button>
+          <button onClick={cpiIncrementBy7}>
+            Call CPI contract (Increment by 7)
+          </button>
+        </div>
+    
       </div>
-
-      <div className="relative z-[-1] flex place-items-center before:absolute before:h-[300px] before:w-full before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-full after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 sm:before:w-[480px] sm:after:w-[240px] before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:w-full lg:max-w-5xl lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Docs{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Learn{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Templates{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-sm opacity-50">
-            Explore starter templates for Next.js.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className="mb-3 text-2xl font-semibold">
-            Deploy{" "}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className="m-0 max-w-[30ch] text-balance text-sm opacity-50">
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  );
+    </>
+  )
 }
+
+const getProvider = () => {
+  if ('phantom' in window) {
+    // @ts-expect-error no  global window 
+    const provider = window.phantom?.solana;
+
+    if (provider?.isPhantom) {
+      return provider;
+    }
+    alert('Please install Phantom wallet')
+  }
+
+  window.open('https://phantom.app/', '_blank');
+};
+
+class Counter {
+  count = 0;
+  constructor(fields = undefined) {
+    if (fields) {
+      // @ts-expect-error no fields
+      this.count = fields.count;
+    }
+  }
+}
+
+export const CounterSchema = new Map([
+  [Counter, { kind: "struct", fields: [["count", "u64"]] }]
+])
