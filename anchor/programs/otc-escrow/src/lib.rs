@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token::{Mint, Token, TokenAccount}};
 
-declare_id!("2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT");
+declare_id!("3ABaSGjqosivGTtFZETqkrM72wK1xGUjPPL5YbhJrGM6");
 
 #[program]
 pub mod escrow {
@@ -126,6 +126,18 @@ pub struct Initialize<'info> {
     pub token_account_maker: Account<'info, TokenAccount>,
 
     #[account(
+        init, 
+        payer = maker,
+        space = 8 + OtcOffer::INIT_SPACE,
+        // we're using the otc_offer account as the ATA authority for contract
+        // this creates a PDA for the otc_offer account with the following seeds
+        seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
+        bump
+    )] 
+    pub otc_offer: Account<'info, OtcOffer>,
+
+    // must be specified after `otc_offer` because authority is otc_offer
+    #[account(
         // it's complicated create this client-side since you have to use the 
         // seeds for `otc_offer` below to point the authority to `otc_offer`.
         // just let Anchor create this account
@@ -136,17 +148,6 @@ pub struct Initialize<'info> {
         associated_token::token_program = token_program
     )]
     pub contract_token_account: Account<'info, TokenAccount>,
-
-    #[account(
-        init, 
-        payer = maker,
-        space = 8 + OtcOffer::INIT_SPACE,
-        // we're using the otc_offer account as the ATA authority for contract
-        // this creates a PDA for the otc_offer account with the following seeds
-        seeds = [b"otc_offer", maker.key().as_ref(), id_seed.to_le_bytes().as_ref()],
-        bump
-    )] 
-    pub otc_offer: Account<'info, OtcOffer>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,

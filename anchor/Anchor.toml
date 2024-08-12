@@ -5,8 +5,8 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-anchor_counter = "8rK93pjtsMfxvLayRD8Ypa9YJCursWoCT7379KTJtzxb"
-escrow = "2Ny42tQow4mph5MW5AZSoM6TJ2ABa5JEGcGrxs6c1myT"
+anchor_counter = "2wGCYGDVebNSEKh76HqYGKGpvHup1PynopEpQRVJzfgN"
+escrow = "3ABaSGjqosivGTtFZETqkrM72wK1xGUjPPL5YbhJrGM6"
 
 [registry]
 url = "https://api.apr.dev"

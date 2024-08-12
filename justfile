@@ -1,13 +1,12 @@
 keypair_path := '/Users/bao/.config/solana/id.json'
 
-build: 
-  cargo clean
-  cargo build-spf
-
 # make sure solana-test-validator is running locally
 # and RPC is set to local
-deploy: 
-  solana program deploy ./counter-program/target/deploy/counter_program.so  
+build program: 
+  cd anchor && anchor build -p {{program}}
+
+deploy program:
+  cd anchor && anchor deploy -p {{program}}
 
 # MARK: - SPL 2022
 

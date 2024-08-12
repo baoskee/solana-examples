@@ -1,6 +1,7 @@
 {
   "name": "anchor-local",
   "scripts": {
+    "clean": "rm -rf target node_modules",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
