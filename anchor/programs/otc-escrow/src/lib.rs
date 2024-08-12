@@ -117,8 +117,8 @@ pub struct Initialize<'info> {
     pub token_mint_b: Account<'info, Mint>,
 
     #[account(
-        // @improvement: add init_if_needed constraint 
-        mut,
+        init_if_needed,
+        payer = maker,
         associated_token::mint = token_mint_a,
         associated_token::authority = maker,
         associated_token::token_program = token_program
@@ -183,10 +183,7 @@ pub struct OtcOffer {
 pub struct Claim<'info> {
     #[account(mut)]
     pub taker: Signer<'info>,
-
-    // @todo does the maker need to be mutable? I thought only its TokenAccount is mutable
-    // we need to pass maker in because token_b will be transferred (mutated)
-    #[account(mut)]
+    // maker does not need to be mutable, since only their token account is changing
     pub maker: SystemAccount<'info>,
 
     pub token_mint_a: Account<'info, Mint>,
@@ -212,11 +209,10 @@ pub struct Claim<'info> {
     )]
     pub contract_token_account: Account<'info, TokenAccount>,
 
-    // @todo add init_if_needed constraint to (some) accounts below
-
     // needs taker account for token b (for transfer to a)
     #[account(
-        mut,
+        init_if_needed,
+        payer = taker,
         associated_token::mint = token_mint_b,
         associated_token::authority = taker,
         associated_token::token_program = token_program
@@ -225,7 +221,8 @@ pub struct Claim<'info> {
 
     // needs maker account for token b (for taker to transfer to)
     #[account(
-        mut,
+        init_if_needed,
+        payer = taker,
         associated_token::mint = token_mint_b,
         associated_token::authority = maker,
         associated_token::token_program = token_program
@@ -234,7 +231,8 @@ pub struct Claim<'info> {
 
     // needs taker account for token a (for contract to transfer to taker)
     #[account(
-        mut,
+        init_if_needed,
+        payer = taker,
         associated_token::mint = token_mint_a,
         associated_token::authority = taker,
         associated_token::token_program = token_program
@@ -242,4 +240,7 @@ pub struct Claim<'info> {
     pub token_account_taker_a: Account<'info, TokenAccount>,
 
     pub token_program: Program<'info, Token>,
+    // These are needed for the optional `init_if_needed` ATA accounts
+    pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
