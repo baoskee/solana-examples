@@ -66,12 +66,39 @@ export default function EscrowPage() {
         )
 
         const offerDetails = await program.account.otcOffer.fetch(offerPda)
-        return offerDetails
+        return {
+          ...offerDetails,
+          tokenAAmount: offerDetails.tokenAAmount.toNumber(),
+          tokenBAmount: offerDetails.tokenBAmount.toNumber(),
+          id: offerDetails.idSeed.toNumber(),
+        }
       } catch (e) {
         console.error(e)
       }
     }
   })
+
+  const claimOffer = useCallback(async () => {
+    if (!offerDetails.data) return
+    try {
+      const provider = await anchorProvider();
+      const program = new anchor.Program<Escrow>(
+        // @ts-ignore
+        escrowIDL, provider);
+      const res = await program.methods.claim()
+        .accounts({
+          maker: offerDetails.data.maker,
+          taker: provider.wallet.publicKey,
+          tokenMintA: offerDetails.data.tokenMintA,
+          tokenMintB: offerDetails.data.tokenMintB,
+        })
+        .rpc();
+
+      console.log(res)
+    } catch (e) {
+      console.error(e)
+    }
+  }, [offerDetails.data])
 
   return <div>
     <div>
@@ -92,6 +119,9 @@ export default function EscrowPage() {
     </div>
     <button className="my-4" onClick={depositEscrow}>
       Deposit Escrow
+    </button>
+    <button className="my-4" onClick={claimOffer}>
+      Claim offer with {offerDetails.data?.tokenBAmount} TokenB
     </button>
 
   </div>
