@@ -14,7 +14,7 @@ const TOKEN_MINT_B = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
 const TOKEN_MINT_B_AMOUNT = 200
 const TAKER = "HNc5mQKb5X7Agsk866kxM1yLv6dVDTPJnuPSsanGhrFo"
 
-const OFFER_ID = 4; // increment this to create new offers
+const OFFER_ID = 5; // increment this to create new offers
 
 export default function EscrowPage() {
 
@@ -85,12 +85,22 @@ export default function EscrowPage() {
       const program = new anchor.Program<Escrow>(
         // @ts-ignore
         escrowIDL, provider);
+        const [offerPda, _] = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("otc_offer"),
+            provider.wallet.publicKey.toBuffer(), // maker seed 
+            new anchor.BN(OFFER_ID).toArrayLike(Buffer, "le", 8)
+          ],
+          program.programId
+        )
       const res = await program.methods.claim()
         .accounts({
           maker: offerDetails.data.maker,
           taker: provider.wallet.publicKey,
           tokenMintA: offerDetails.data.tokenMintA,
           tokenMintB: offerDetails.data.tokenMintB,
+          // @ts-ignore
+          otcOffer: offerPda,
         })
         .rpc();
 
@@ -111,18 +121,20 @@ export default function EscrowPage() {
     </div>
     <div>
       <div>Offer ID: {OFFER_ID}</div>
-      <div>Offer Details: 
+      <div>Offer Details:
         <pre className="text-xs">
           {offerDetails.data && JSON.stringify(offerDetails.data, null, 2)}
         </pre>
       </div>
     </div>
-    <button className="my-4" onClick={depositEscrow}>
-      Deposit Escrow
-    </button>
-    <button className="my-4" onClick={claimOffer}>
-      Claim offer with {offerDetails.data?.tokenBAmount} TokenB
-    </button>
+    <div className="flex flex-col gap-2 my-2">
+      <button onClick={depositEscrow}>
+        Deposit Escrow
+      </button>
+      <button onClick={claimOffer}>
+        Claim offer with {offerDetails.data?.tokenBAmount} TokenB
+      </button>
+    </div>
 
   </div>
 }
