@@ -66,11 +66,12 @@ export default function EscrowPage() {
         )
 
         const offerDetails = await program.account.otcOffer.fetch(offerPda)
+        
         return {
           ...offerDetails,
           tokenAAmount: offerDetails.tokenAAmount.toNumber(),
           tokenBAmount: offerDetails.tokenBAmount.toNumber(),
-          id: offerDetails.idSeed.toNumber(),
+          idSeed: offerDetails.idSeed.toNumber(),
         }
       } catch (e) {
         console.error(e)
