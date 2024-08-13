@@ -1,5 +1,6 @@
 import { Wallet } from "@coral-xyz/anchor";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
+import * as anchor from "@coral-xyz/anchor";
 
 export const getProvider = (): SolanaProvider => {
   if ('phantom' in window) {
@@ -45,6 +46,20 @@ export const signAndBroadcast = async (
   const confirmation = await connection.confirmTransaction(signature);
 
   return confirmation;
+}
+
+/**
+ * ```
+ * const provider = await anchorProvider();
+ * anchor.setProvider(provider);
+ * ```
+ */
+export const anchorProvider = async () => {
+  const wallet = await connectAnchorWallet();
+  const connection = new Connection(LOCAL_RPC_URL);
+
+  const provider = new anchor.AnchorProvider(connection, wallet, {});
+  return provider;
 }
 
 export const LOCAL_RPC_URL = "http://127.0.0.1:8899"

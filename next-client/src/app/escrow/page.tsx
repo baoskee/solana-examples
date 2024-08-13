@@ -1,6 +1,6 @@
 "use client"
 
-import { connectAnchorWallet, LOCAL_RPC_URL } from "@/lib/util"
+import { anchorProvider, connectAnchorWallet, LOCAL_RPC_URL } from "@/lib/util"
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as anchor from '@coral-xyz/anchor';
 import { useCallback } from "react";
@@ -66,7 +66,7 @@ export default function EscrowPage() {
         )
 
         const offerDetails = await program.account.otcOffer.fetch(offerPda)
-        
+
         return {
           ...offerDetails,
           tokenAAmount: offerDetails.tokenAAmount.toNumber(),
@@ -86,14 +86,14 @@ export default function EscrowPage() {
       const program = new anchor.Program<Escrow>(
         // @ts-ignore
         escrowIDL, provider);
-        const [offerPda, _] = PublicKey.findProgramAddressSync(
-          [
-            Buffer.from("otc_offer"),
-            provider.wallet.publicKey.toBuffer(), // maker seed 
-            new anchor.BN(OFFER_ID).toArrayLike(Buffer, "le", 8)
-          ],
-          program.programId
-        )
+      const [offerPda, _] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("otc_offer"),
+          provider.wallet.publicKey.toBuffer(), // maker seed 
+          new anchor.BN(OFFER_ID).toArrayLike(Buffer, "le", 8)
+        ],
+        program.programId
+      )
 
       const res = await program.methods.claim()
         .accounts({
@@ -139,18 +139,4 @@ export default function EscrowPage() {
     </div>
 
   </div>
-}
-
-/**
- * ```
- * const provider = await anchorProvider();
- * anchor.setProvider(provider);
- * ```
- */
-const anchorProvider = async () => {
-  const wallet = await connectAnchorWallet();
-  const connection = new Connection(LOCAL_RPC_URL);
-
-  const provider = new anchor.AnchorProvider(connection, wallet, {});
-  return provider;
 }
