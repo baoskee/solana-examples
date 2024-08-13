@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{associated_token::AssociatedToken, token::{Mint, Token, TokenAccount}};
 
-declare_id!("218SyZHnKhCaJVMNJvp5Js2rhvHo3Wfc3XpLLFy1HCoQ");
+declare_id!("5dQFbuSAY7XeF7VUNqm2djqEDmBNhmRyXhru1e7T1T63");
 
 #[program]
 pub mod escrow {
@@ -35,6 +35,7 @@ pub mod escrow {
             ctx.accounts.token_mint_a.decimals,
         )?;
 
+        msg!("Taker key issue: {}", taker.key());
         // 2. initialize the otc_offer account
         ctx.accounts.otc_offer.set_inner(OtcOffer {
             maker: ctx.accounts.maker.key(),
@@ -179,6 +180,18 @@ pub struct OtcOffer {
     // so we have to manually store it in Initialize
 }
 
+#[error_code]
+pub enum EscrowError {
+    #[msg("Invalid maker")]
+    InvalidMaker,
+    #[msg("Invalid taker")]
+    InvalidTaker,
+    #[msg("Invalid token a")]
+    InvalidTokenA,
+    #[msg("Invalid token b")]
+    InvalidTokenB,
+}
+
 #[derive(Accounts)]
 pub struct Claim<'info> {
     #[account(mut)]
@@ -190,10 +203,10 @@ pub struct Claim<'info> {
     pub token_mint_b: Account<'info, Mint>,
 
     #[account(
-        constraint = otc_offer.maker == maker.key(),
-        constraint = otc_offer.taker == taker.key(),
-        constraint = otc_offer.token_mint_a == token_mint_a.key(),
-        constraint = otc_offer.token_mint_b == token_mint_b.key(),
+        constraint = otc_offer.maker == maker.key() @ EscrowError::InvalidMaker,
+        constraint = otc_offer.taker == taker.key() @ EscrowError::InvalidTaker,
+        constraint = otc_offer.token_mint_a == token_mint_a.key() @ EscrowError::InvalidTokenA,
+        constraint = otc_offer.token_mint_b == token_mint_b.key() @ EscrowError::InvalidTokenB,
         // note init is not a constraint, so this just verifies that account passed in
         // is the correct PDA
         seeds = [b"otc_offer", otc_offer.maker.key().as_ref(), otc_offer.id_seed.to_le_bytes().as_ref()],
