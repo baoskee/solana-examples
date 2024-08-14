@@ -1,6 +1,6 @@
 "use client"
 import { anchorProvider } from "@/lib/util"
-import { Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
 import { useCallback } from "react"
 import { pubkeyArgIDL, type PubkeyArg } from "anchor-local";
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -24,7 +24,13 @@ export default function PubkeyArg() {
         provider
       );
 
-      return program.account.pubkeyArg.fetch(pubkeyAccount.publicKey);
+      const res = await program.account.pubkeyArg.fetch(pubkeyAccount.publicKey);
+      return {
+        ...res,
+        idSeed: res.idSeed.toNumber(),
+        tokenAAmount: res.tokenAAmount.toNumber(),
+        tokenBAmount: res.tokenBAmount.toNumber(),
+      }
     }
   })
 
@@ -36,7 +42,11 @@ export default function PubkeyArg() {
       provider
     );
 
-    const signature = await program.methods.initialize(new PublicKey(PUBKEY_TO_SAVE))
+    const signature = await program.methods.initialize(
+      new BN(1),
+      new BN(2),
+      new BN(3),
+      new PublicKey(PUBKEY_TO_SAVE))
       .accounts({
         signer: provider.publicKey,
         pubkeyArg: pubkeyAccount.publicKey,
@@ -57,7 +67,7 @@ export default function PubkeyArg() {
   return <div>
     <div>
       <p>Saved pubkey:</p>
-      {savedPubkey.data?.value && <p>{savedPubkey.data.value.toBase58()}</p>}
+      <pre>{JSON.stringify(savedPubkey.data, null, 2)}</pre>
     </div>
     <button onClick={savePubkey}>
       Save Pubkey

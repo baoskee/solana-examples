@@ -5,6 +5,8 @@ keypair_path := '/Users/bao/.config/solana/id.json'
 build program: 
   cd anchor && anchor build -p {{program}}
 
+# if space not big enough do 
+# `solana program extend <program_id> <space_in_bytes>`
 deploy program:
   cd anchor && anchor deploy -p {{program}}
 

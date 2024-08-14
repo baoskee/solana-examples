@@ -6,8 +6,19 @@ declare_id!("2hAqft8LyeYA6KZhptCjhLCLepdukDk8rk1TBAoAkDk2");
 pub mod pubkey_arg {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, value: Pubkey) -> Result<()> {
-        ctx.accounts.pubkey_arg.set_inner(PubkeyArg { value });
+    pub fn initialize(
+        ctx: Context<Initialize>,
+        id_seed: u64,
+        token_a_amount: u64,
+        token_b_amount: u64,
+        value: Pubkey,
+    ) -> Result<()> {
+        ctx.accounts.pubkey_arg.set_inner(PubkeyArg {
+            id_seed,
+            token_a_amount,
+            token_b_amount,
+            value,
+        });
         Ok(())
     }
 }
@@ -19,7 +30,7 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = signer,
-        space = 8 + 32,
+        space = 8 + PubkeyArg::INIT_SPACE,
     )]
     pub pubkey_arg: Account<'info, PubkeyArg>,
 
@@ -27,6 +38,11 @@ pub struct Initialize<'info> {
 }
 
 #[account]
+#[derive(InitSpace)]
+
 pub struct PubkeyArg {
+    pub id_seed: u64,
+    pub token_a_amount: u64,
+    pub token_b_amount: u64,
     pub value: Pubkey,
 }
