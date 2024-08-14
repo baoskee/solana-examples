@@ -2,9 +2,11 @@
 import { anchorProvider } from "@/lib/util"
 import { Program } from "@coral-xyz/anchor";
 import { useCallback } from "react"
-import { pubkeyArgIDL, type PubkeyArg, escrowIDL } from "anchor-local";
+import { pubkeyArgIDL, type PubkeyArg } from "anchor-local";
 import { PublicKey } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
+import { SystemProgram } from "@solana/web3.js";
+
 
 const PUBKEY_TO_SAVE = "GriAght9Mi9m3BTKvPUM6426axdGayqCuqczczJrykdi";
 
@@ -19,12 +21,18 @@ export default function PubkeyArg() {
     );
     const [pubkeyArgAddr] = PublicKey.findProgramAddressSync(
       [
-        Buffer.from("pubkeyArg"),
-        new Uint8Array(escrowIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
+        program.programId.toBuffer(),
+        new Uint8Array(pubkeyArgIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
       ],
       program.programId
     );
     const signature = await program.methods.initialize(new PublicKey(PUBKEY_TO_SAVE))
+      .accounts({
+        signer: provider.publicKey,
+        pubkeyArg: pubkeyArgAddr,
+        // @ts-expect-error
+        systemProgram: SystemProgram.programId,
+      })
       .rpc();
 
     await provider.connection.confirmTransaction(signature);
@@ -43,8 +51,8 @@ export default function PubkeyArg() {
       // seed: [programId, discriminator]
       const [pubkeyArgAddr] = PublicKey.findProgramAddressSync(
         [
-          Buffer.from("pubkeyArg"),
-          new Uint8Array(escrowIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
+          program.programId.toBuffer(),
+          new Uint8Array(pubkeyArgIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
         ],
         program.programId
       );
