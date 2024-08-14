@@ -1,3 +1,4 @@
+"use client"
 import { anchorProvider } from "@/lib/util"
 import { Program } from "@coral-xyz/anchor";
 import { useCallback } from "react"
@@ -16,9 +17,15 @@ export default function PubkeyArg() {
       pubkeyArgIDL,
       provider
     );
+    const [pubkeyArgAddr] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("pubkeyArg"),
+        new Uint8Array(escrowIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
+      ],
+      program.programId
+    );
     const signature = await program.methods.initialize(new PublicKey(PUBKEY_TO_SAVE))
-      .accounts({})
-      .rpc()
+      .rpc();
 
     await provider.connection.confirmTransaction(signature);
     console.log("Signature", signature);
@@ -37,7 +44,7 @@ export default function PubkeyArg() {
       const [pubkeyArgAddr] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("pubkeyArg"),
-          Buffer.from(escrowIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
+          new Uint8Array(escrowIDL.accounts.find((acc) => acc.name === "pubkeyArg")?.discriminator!)
         ],
         program.programId
       );
