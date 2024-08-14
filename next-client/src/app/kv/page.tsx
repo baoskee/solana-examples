@@ -34,6 +34,7 @@ export default function KVPage() {
       );
       const pda = anchor.web3.PublicKey.findProgramAddressSync(
         [
+          Buffer.from("kv_store", "utf8"),
           provider.publicKey.toBuffer(),
           new anchor.BN(storeID).toArrayLike(Buffer, "le", 8),
           Buffer.from(queryKey, "utf8"),
@@ -75,17 +76,19 @@ export default function KVPage() {
         <p>Store: {storePubkey.data}</p>
       </div>
     </div>
-    <div >
+    <div className="flex flex-col gap-2">
       <input type="text"
         placeholder="query key"
         value={queryKey}
         onChange={(e) => setQueryKey(e.target.value)}
       />
       <button onClick={onGetClick}>Get</button>
-      <div>
+      <div className="text-lg text-yellow-500">
         Result: {queryValue}
       </div>
     </div>
+
+    <hr className="my-4 border-gray-300" />
 
     <div className="flex flex-col gap-2">
       <input type="text"
