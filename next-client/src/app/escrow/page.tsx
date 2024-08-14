@@ -1,7 +1,7 @@
 "use client";
 
 import { anchorProvider, connectAnchorWallet, LOCAL_RPC_URL } from "@/lib/util"
-import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import * as anchor from '@coral-xyz/anchor';
 import { useCallback } from "react";
 import { escrowIDL, Escrow } from "anchor-local";
@@ -15,7 +15,7 @@ const TOKEN_MINT_B = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
 const TOKEN_MINT_B_AMOUNT = 200
 const TAKER = "HNc5mQKb5X7Agsk866kxM1yLv6dVDTPJnuPSsanGhrFo"
 
-const OFFER_ID = 15; // increment this to create new offers
+const OFFER_ID = 16; // increment this to create new offers
 
 export default function EscrowPage() {
   // to get OTC offer accounts, simply derive PDA from seed in program
@@ -74,6 +74,14 @@ export default function EscrowPage() {
         ],
         program.programId
       )
+      const contractTokenAccount = PublicKey.findProgramAddressSync(
+        [
+          otcOfferAddr.toBuffer(),
+          TOKEN_PROGRAM_ID.toBuffer(),
+          new PublicKey(TOKEN_MINT_A).toBuffer()
+        ],
+        ASSOCIATED_PROGRAM_ID
+      );
       const res = await program.methods.initialize(
         // increment this to create new offers
         new anchor.BN(OFFER_ID),
@@ -85,6 +93,8 @@ export default function EscrowPage() {
           maker: provider.wallet.publicKey,
           tokenMintA: new anchor.web3.PublicKey(TOKEN_MINT_A),
           tokenMintB: new anchor.web3.PublicKey(TOKEN_MINT_B),
+          // @ts-ignore
+          contractTokenAccount: contractTokenAccount,
           // @ts-ignore
           tokenAccountMaker: makerTokenAAccount,
           otcOffer: otcOfferAddr,
