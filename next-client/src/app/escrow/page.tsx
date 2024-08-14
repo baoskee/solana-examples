@@ -1,7 +1,7 @@
 "use client";
 
-import { anchorProvider, connectAnchorWallet, LOCAL_RPC_URL } from "@/lib/util"
-import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { anchorProvider, connectAnchorWallet, getProvider, LOCAL_RPC_URL, signAndBroadcast } from "@/lib/util"
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import * as anchor from '@coral-xyz/anchor';
 import { useCallback } from "react";
 import { escrowIDL, Escrow } from "anchor-local";
@@ -10,12 +10,12 @@ import { ASSOCIATED_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@coral-xyz/anchor/dist/
 
 // Fill out your params here
 const TOKEN_MINT_A = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
-const TOKEN_MINT_A_AMOUNT = 100
+const TOKEN_MINT_A_AMOUNT = 420
 const TOKEN_MINT_B = "5CiESJk1uYGZ82S4YhaC5YCjRbUX1J4Q6Xf2ZWmYC6g7"
-const TOKEN_MINT_B_AMOUNT = 200
+const TOKEN_MINT_B_AMOUNT = 99_234
 const TAKER = "HNc5mQKb5X7Agsk866kxM1yLv6dVDTPJnuPSsanGhrFo"
 
-const OFFER_ID = 16; // increment this to create new offers
+const OFFER_ID = 1; // increment this to create new offers
 
 export default function EscrowPage() {
   // to get OTC offer accounts, simply derive PDA from seed in program
@@ -82,12 +82,12 @@ export default function EscrowPage() {
         ],
         ASSOCIATED_PROGRAM_ID
       );
-      const res = await program.methods.initialize(
+      const inst = await program.methods.initialize(
         // increment this to create new offers
-        new anchor.BN(OFFER_ID),
-        new anchor.BN(TOKEN_MINT_A_AMOUNT),
-        new anchor.BN(TOKEN_MINT_B_AMOUNT),
-        new PublicKey(TAKER)
+        new anchor.BN(OFFER_ID), // u64 = 8 bytes
+        new anchor.BN(TOKEN_MINT_A_AMOUNT), // u64 = 8 bytes
+        new anchor.BN(TOKEN_MINT_B_AMOUNT), // u64 = 8 bytes
+        new PublicKey(TAKER) // 32 bytes
       )
         .accounts({
           maker: provider.wallet.publicKey,
@@ -103,10 +103,25 @@ export default function EscrowPage() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
-        .rpc();
+        .instruction();
+      // @todo try running instruction() instead of rpc()
+      // might be issue with encoding the arguments
+
+      const taker = new PublicKey(TAKER)
+      console.log(taker.toBuffer())
+      console.log(taker.toBase58())
+      console.log(inst.keys.map(k => k.pubkey.toBase58()))
+
+      const tx = new Transaction().add(inst)
+      const connection = new Connection(LOCAL_RPC_URL)
+      const wallet = getProvider()
+      await wallet.connect()
+      const confirmation = await signAndBroadcast(connection, wallet, tx)
+
+      console.log("confirmation", confirmation)
 
       // transaction signature
-      console.log(res);
+      console.log(inst);
       offerDetails.refetch()
     } catch (e) {
       console.error(e);

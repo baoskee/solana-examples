@@ -43,6 +43,7 @@ export const signAndBroadcast = async (
 
   const signed = await provider.signTransaction(transaction);
   const signature = await connection.sendRawTransaction(signed.serialize());
+  console.log("signature:", signature)
   const confirmation = await connection.confirmTransaction(signature);
 
   return confirmation;
