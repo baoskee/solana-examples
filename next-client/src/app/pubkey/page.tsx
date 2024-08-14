@@ -50,8 +50,6 @@ export default function PubkeyArg() {
       .accounts({
         signer: provider.publicKey,
         pubkeyArg: pubkeyAccount.publicKey,
-        // @ts-expect-error
-        systemProgram: SystemProgram.programId,
       })
       .signers([pubkeyAccount])
       .rpc();
