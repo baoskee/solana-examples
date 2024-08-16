@@ -64,7 +64,8 @@ pub struct Execute<'info> {
         bump
     )]
     pub wallet: Account<'info, Wallet>,
-    pub instruction_program: AccountInfo<'info> 
+    /// CHECK: This is unchecked because we don't know what the instruction program is
+    pub instruction_program: UncheckedAccount<'info>,
 }
 
 #[account]
