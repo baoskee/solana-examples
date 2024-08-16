@@ -4,7 +4,7 @@ declare_id!("BKhDWiNiM9ZEo3Deyf7MmfDMyDYwLeGLagorJ5GtV8XC");
 
 #[program]
 pub mod smart_wallet {
-    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed, system_instruction};
+    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
 
     use super::*;
 
@@ -18,7 +18,7 @@ pub mod smart_wallet {
         let seeds = &[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]];
         let signer_seeds = &[&seeds[..]];
 
-        let mut accounts = ctx.remaining_accounts.iter().map(|a| {
+        let accounts = ctx.remaining_accounts.iter().map(|a| {
             AccountMeta {
                 pubkey: a.key(),
                 is_signer: a.is_signer,
@@ -27,11 +27,12 @@ pub mod smart_wallet {
         }).collect::<Vec<AccountMeta>>();
 
         // smart wallet itself must be signer, and writable
-        accounts.push(AccountMeta {
-            pubkey: ctx.accounts.wallet.key(),
-            is_signer: true,
-            is_writable: true, // for native SOL transfers
-        });
+        // @todo currently having lifetime issues below
+        // accounts.push(AccountMeta {
+        //     pubkey: ctx.accounts.wallet.key(),
+        //     is_signer: true,
+        //     is_writable: true, // for native SOL transfers
+        // });
 
         let instruction = Instruction {
             program_id: ctx.accounts.instruction_program.key(),
