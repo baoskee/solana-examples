@@ -61,11 +61,12 @@ export default function SmartWalletPage() {
       // @ts-expect-error
       smartWalletIDL, provider);
 
+    const SOL_TRANSFER_RECIPIENT = provider.wallet.publicKey;
     const solTransferData = SystemProgram.transfer({
       fromPubkey: smartWalletAddr.data,
       lamports: LAMPORTS_PER_SOL * 1,
       // back to authority, can change this to any other account
-      toPubkey: provider.wallet.publicKey,
+      toPubkey: SOL_TRANSFER_RECIPIENT,
     }).data;
 
     const res = await program.methods.execute(solTransferData)
@@ -76,7 +77,21 @@ export default function SmartWalletPage() {
         authority: provider.wallet.publicKey,
         wallet: smartWalletAddr.data,
       })
+      .remainingAccounts([
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+        {
+          // recipient of SOL transfer
+          pubkey: SOL_TRANSFER_RECIPIENT,
+          isSigner: false,
+          isWritable: false,
+        }
+      ])
       .rpc();
+
     console.log(res);
   }, [smartWalletAddr])
 
