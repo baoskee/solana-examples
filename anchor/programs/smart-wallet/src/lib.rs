@@ -39,13 +39,10 @@ pub mod smart_wallet {
             data,
         };
 
-        // Collect all account infos
-        let mut all_account_infos = vec![ctx.accounts.wallet.to_account_info()];
-        all_account_infos.extend(ctx.remaining_accounts.iter().cloned());
-
         invoke_signed(
             &instruction,
-            all_account_infos.as_slice(),
+            // @todo include current account as signer?
+            ctx.remaining_accounts,
             signer_seeds,
         )?;
         Ok(())
