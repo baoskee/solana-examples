@@ -4,7 +4,7 @@ import * as anchor from "@coral-xyz/anchor"
 import { anchorProvider } from "@/lib/util"
 import { SmartWallet, smartWalletIDL } from "anchor-local"
 import { useQuery } from "@tanstack/react-query"
-import { PublicKey } from "@solana/web3.js"
+import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
 
 export default function SmartWalletPage() {
 
@@ -53,6 +53,33 @@ export default function SmartWalletPage() {
     smartWalletAddr.refetch();
   }, [smartWalletAddr])
 
+  const sendFromSmartWallet = useCallback(async () => {
+    if (!smartWalletAddr.data) return;
+
+    const provider = await anchorProvider();
+    const program = new anchor.Program<SmartWallet>(
+      // @ts-expect-error
+      smartWalletIDL, provider);
+
+    const solTransferData = SystemProgram.transfer({
+      fromPubkey: smartWalletAddr.data,
+      lamports: LAMPORTS_PER_SOL * 1,
+      // back to authority, can change this to any other account
+      toPubkey: provider.wallet.publicKey,
+    }).data;
+
+    const res = await program.methods.execute(solTransferData)
+      .accounts({
+        // System program is responsible for SOL transfers
+        instructionProgram: SystemProgram.programId,
+        // @ts-expect-error
+        authority: provider.wallet.publicKey,
+        wallet: smartWalletAddr.data,
+      })
+      .rpc();
+    console.log(res);
+  }, [smartWalletAddr])
+
   return <div>
     <div className="flex flex-col gap-2 pb-4">
       <h1 className="text-2xl font-bold">Smart wallet Demo</h1>
@@ -63,7 +90,7 @@ export default function SmartWalletPage() {
       <button onClick={createSmartWallet}>
         Create smart wallet
       </button>
-      <button>
+      <button onClick={sendFromSmartWallet}>
         Send (decrement) 1 SOL from smart wallet
       </button>
     </div>

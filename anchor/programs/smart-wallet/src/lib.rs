@@ -4,7 +4,7 @@ declare_id!("BKhDWiNiM9ZEo3Deyf7MmfDMyDYwLeGLagorJ5GtV8XC");
 
 #[program]
 pub mod smart_wallet {
-    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed};
+    use anchor_lang::solana_program::{instruction::Instruction, program::invoke_signed, system_instruction};
 
     use super::*;
 
