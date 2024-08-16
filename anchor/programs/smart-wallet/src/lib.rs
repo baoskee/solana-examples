@@ -18,13 +18,20 @@ pub mod smart_wallet {
         let seeds = &[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]];
         let signer_seeds = &[&seeds[..]];
 
-        let accounts = ctx.remaining_accounts.iter().map(|a| {
+        let mut accounts = ctx.remaining_accounts.iter().map(|a| {
             AccountMeta {
                 pubkey: a.key(),
                 is_signer: a.is_signer,
                 is_writable: a.is_writable,
             }
-        }).collect();
+        }).collect::<Vec<AccountMeta>>();
+
+        // smart wallet itself must be signer, and writable
+        accounts.push(AccountMeta {
+            pubkey: ctx.accounts.wallet.key(),
+            is_signer: true,
+            is_writable: true, // for native SOL transfers
+        });
 
         let instruction = Instruction {
             program_id: ctx.accounts.instruction_program.key(),
@@ -32,7 +39,15 @@ pub mod smart_wallet {
             data,
         };
 
-        invoke_signed(&instruction, ctx.remaining_accounts, signer_seeds)?;
+        // Collect all account infos
+        let mut all_account_infos = vec![ctx.accounts.wallet.to_account_info()];
+        all_account_infos.extend(ctx.remaining_accounts.iter().cloned());
+
+        invoke_signed(
+            &instruction,
+            all_account_infos.as_slice(),
+            signer_seeds,
+        )?;
         Ok(())
     }
 }

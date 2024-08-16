@@ -87,7 +87,7 @@ export default function SmartWalletPage() {
           // recipient of SOL transfer
           pubkey: SOL_TRANSFER_RECIPIENT,
           isSigner: false,
-          isWritable: false,
+          isWritable: true,
         }
       ])
       .rpc();
