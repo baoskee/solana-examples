@@ -14,11 +14,14 @@ pub mod smart_wallet {
         Ok(())
     }
 
-    pub fn execute(ctx: Context<Execute>, data: Vec<u8>) -> Result<()> {
+    pub fn execute<'c: 'info, 'info>(
+        ctx: Context<'_, '_, 'c, 'info, Execute<'info>>, 
+        data: Vec<u8>
+    ) -> Result<()> {
         let seeds = &[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]];
         let signer_seeds = &[&seeds[..]];
 
-        let accounts = ctx.remaining_accounts.iter().map(|a| {
+        let mut accounts = ctx.remaining_accounts.iter().map(|a| {
             AccountMeta {
                 pubkey: a.key(),
                 is_signer: a.is_signer,
@@ -27,12 +30,11 @@ pub mod smart_wallet {
         }).collect::<Vec<AccountMeta>>();
 
         // smart wallet itself must be signer, and writable
-        // @todo currently having lifetime issues below
-        // accounts.push(AccountMeta {
-        //     pubkey: ctx.accounts.wallet.key(),
-        //     is_signer: true,
-        //     is_writable: true, // for native SOL transfers
-        // });
+        accounts.push(AccountMeta {
+            pubkey: ctx.accounts.wallet.key(),
+            is_signer: true,
+            is_writable: true, // for native SOL transfers
+        });
 
         let instruction = Instruction {
             program_id: ctx.accounts.instruction_program.key(),
@@ -40,10 +42,14 @@ pub mod smart_wallet {
             data,
         };
 
+        let accounts = [
+            &[ctx.accounts.wallet.to_account_info().clone()],
+            ctx.remaining_accounts,
+        ].concat();
+
         invoke_signed(
             &instruction,
-            // @todo include current account as signer?
-            ctx.remaining_accounts,
+            &accounts,
             signer_seeds,
         )?;
         Ok(())
