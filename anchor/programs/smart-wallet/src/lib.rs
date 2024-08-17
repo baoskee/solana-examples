@@ -9,8 +9,8 @@ pub mod smart_wallet {
     use super::*;
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        let wallet = &mut ctx.accounts.wallet;
-        wallet.authority = ctx.accounts.authority.key();
+        let wallet_meta = &mut ctx.accounts.wallet_meta;
+        wallet_meta.authority = ctx.accounts.authority.key();
         Ok(())
     }
 
@@ -18,21 +18,20 @@ pub mod smart_wallet {
         ctx: Context<'_, '_, 'c, 'info, Execute<'info>>, 
         data: Vec<u8>
     ) -> Result<()> {
-        let signer_seeds: &[&[&[u8]]] = &[&[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]]];
-        let mut accounts = ctx.remaining_accounts.iter().map(|a| {
+        let meta_key = ctx.accounts.wallet_meta.to_account_info().key();
+        let signer_seeds: &[&[&[u8]]] = &[&[meta_key.as_ref(), &[ctx.bumps.wallet]]];
+        let accounts = ctx.remaining_accounts.iter().map(|a| { 
             AccountMeta {
                 pubkey: a.key(),
-                is_signer: a.is_signer,
-                is_writable: a.is_writable,
+                // smart wallet itself must be signer always
+                is_signer: a.key() == ctx.accounts.wallet.key() || a.is_signer,
+                is_writable: a.is_writable, 
             }
         }).collect::<Vec<AccountMeta>>();
 
-        // smart wallet itself must be signer, and writable
-        accounts.push(AccountMeta {
-            pubkey: ctx.accounts.wallet.key(),
-            is_signer: true,
-            is_writable: true, // for native SOL transfers
-        });
+        msg!("Meta Key: {:?}", meta_key);
+        msg!("Signer Seeds: {:?}", signer_seeds);
+        msg!("Accounts: {:?}", accounts);
 
         let instruction = Instruction {
             program_id: ctx.accounts.instruction_program.key(),
@@ -40,14 +39,27 @@ pub mod smart_wallet {
             data,
         };
 
-        let accounts = [
-            &[ctx.accounts.wallet.to_account_info().clone()],
-            ctx.remaining_accounts,
-        ].concat();
+        // Print instruction args
+        msg!("Instruction Program ID: {:?}", instruction.program_id);
+        msg!("Instruction Data: {:?}", instruction.data);
+        msg!("Instruction Accounts:");
+        for (i, account) in instruction.accounts.iter().enumerate() {
+            msg!("  Account {}: pubkey={:?}, is_signer={}, is_writable={}", 
+                 i, account.pubkey, account.is_signer, account.is_writable);
+        }
 
+        let remaining_accounts = ctx.remaining_accounts.iter().map(|a| {
+            let mut account_info = a.to_account_info();
+            if account_info.key() == ctx.accounts.wallet.key() {
+                account_info.is_signer = true;
+            }
+            account_info
+        }).collect::<Vec<_>>();
+
+        // IMPORTANT: Execute on behalf of `wallet` System Account
         invoke_signed(
             &instruction,
-            &accounts,
+            &remaining_accounts,
             signer_seeds,
         )?;
         Ok(())
@@ -62,11 +74,11 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + Wallet::INIT_SPACE,
+        space = 8 + WalletMeta::INIT_SPACE,
         seeds = [authority.key().as_ref()], 
         bump
     )]
-    pub wallet: Account<'info, Wallet>,
+    pub wallet_meta: Account<'info, WalletMeta>,
     pub system_program: Program<'info, System>,
 }
 
@@ -80,13 +92,23 @@ pub struct Execute<'info> {
         seeds = [authority.key().as_ref()],
         bump
     )]
-    pub wallet: Account<'info, Wallet>,
+    pub wallet_meta: Account<'info, WalletMeta>,
+    // canonical wallet address
+    // this PDA uses contract program ID, so we can sign for it.
+    // but it is owned by System Program, so it is in-distinguishable from an EOA wallet
+    #[account(
+        mut,
+        seeds = [wallet_meta.key().as_ref()],
+        bump
+    )]
+    pub wallet: SystemAccount<'info>,
+
     /// CHECK: This is unchecked because we don't know what the instruction program is
     pub instruction_program: UncheckedAccount<'info>,
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct Wallet {
+pub struct WalletMeta {
     pub authority: Pubkey,
 }

@@ -8,33 +8,51 @@ import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
 
 export default function SmartWalletPage() {
 
+  const smartWalletMeta = useQuery({
+    queryKey: ["smart-wallet-metadata-addr"],
+    queryFn: async () => {
+      try {
+        const provider = await anchorProvider();
+        const program = new anchor.Program<SmartWallet>(
+          // @ts-expect-error
+          smartWalletIDL, provider);
+
+        const [addr] = PublicKey.findProgramAddressSync(
+          [provider.wallet.publicKey.toBuffer()],
+          program.programId
+        )
+        const res = await program.account.walletMeta.fetchNullable(addr);
+        console.log("authority", res);
+
+        return addr;
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    }
+  })
+
   const smartWalletAddr = useQuery({
     queryKey: ["smart-wallet-addr"],
     queryFn: async () => {
-      const provider = await anchorProvider();
-      const program = new anchor.Program<SmartWallet>(
-        // @ts-expect-error
-        smartWalletIDL, provider);
-
+      if (!smartWalletMeta.data) return null;
+      const p = await program();
       const [addr] = PublicKey.findProgramAddressSync(
-        [provider.wallet.publicKey.toBuffer()],
-        program.programId
+        [smartWalletMeta.data.toBuffer()],
+        p.programId
       )
-      const res = await program.account.wallet.fetchNullable(addr);
-      console.log("authority", res);
-
       return addr;
-    }
+    },
+    enabled: !!smartWalletMeta.data
   })
 
   const smartWalletBalance = useQuery({
     queryKey: ["smart-wallet-balance"],
     queryFn: async () => {
-      if (!smartWalletAddr.data) {
-        return null;
-      }
-      const provider = await anchorProvider();
-      const connection = provider.connection;
+      if (!smartWalletAddr.data) return null;
+
+      const p = await program();
+      const connection = p.provider.connection;
       const balance = await connection.getBalance(smartWalletAddr.data);
       return balance / anchor.web3.LAMPORTS_PER_SOL;
     },
@@ -50,32 +68,32 @@ export default function SmartWalletPage() {
     const res = await program.methods.initialize()
       .rpc();
     console.log(res);
-    smartWalletAddr.refetch();
-  }, [smartWalletAddr])
+    smartWalletMeta.refetch();
+  }, [smartWalletMeta])
 
   const sendFromSmartWallet = useCallback(async () => {
+    if (!smartWalletMeta.data) return;
+    const p = await program();
+    if (!p.provider.publicKey) return;
     if (!smartWalletAddr.data) return;
 
-    const provider = await anchorProvider();
-    const program = new anchor.Program<SmartWallet>(
-      // @ts-expect-error
-      smartWalletIDL, provider);
+    const SOL_TRANSFER_RECIPIENT = p.provider.publicKey;
 
-    const SOL_TRANSFER_RECIPIENT = provider.wallet.publicKey;
     const solTransferData = SystemProgram.transfer({
-      fromPubkey: smartWalletAddr.data,
+      fromPubkey: smartWalletMeta.data,
       lamports: LAMPORTS_PER_SOL * 1,
       // back to authority, can change this to any other account
       toPubkey: SOL_TRANSFER_RECIPIENT,
     }).data;
 
-    const res = await program.methods.execute(solTransferData)
+    const res = await p.methods.execute(solTransferData)
       .accounts({
+        // @ts-expect-error
+        authority: p.provider.publicKey,
+        walletMeta: smartWalletMeta.data,
+        wallet: smartWalletAddr.data,
         // System program is responsible for SOL transfers
         instructionProgram: SystemProgram.programId,
-        // @ts-expect-error
-        authority: provider.wallet.publicKey,
-        wallet: smartWalletAddr.data,
       })
       .remainingAccounts([
         {
@@ -84,27 +102,29 @@ export default function SmartWalletPage() {
           isWritable: true,
         },
         {
-          pubkey: SystemProgram.programId,
-          isSigner: false,
-          isWritable: false,
-        },
-        {
           // recipient of SOL transfer
           pubkey: SOL_TRANSFER_RECIPIENT,
           isSigner: false,
           isWritable: true,
-        }
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
       ])
       .rpc();
 
+    smartWalletBalance.refetch();
     console.log(res);
-  }, [smartWalletAddr])
+  }, [smartWalletMeta, smartWalletAddr, smartWalletBalance])
 
   return <div>
     <div className="flex flex-col gap-2 pb-4">
       <h1 className="text-2xl font-bold">Smart wallet Demo</h1>
-        <p>Smart wallet address: {smartWalletAddr.data?.toBase58()}</p>
-        <p>Smart wallet balance: {smartWalletBalance.data} SOL</p>
+      <p>Smart wallet metadata address: {smartWalletMeta.data?.toBase58()}</p>
+      <p>Smart wallet address: {smartWalletAddr.data?.toBase58()}</p>
+      <p>Smart wallet balance: {smartWalletBalance.data} SOL</p>
     </div>
     <div className="flex flex-col gap-2">
       <button onClick={createSmartWallet}>
@@ -115,4 +135,13 @@ export default function SmartWalletPage() {
       </button>
     </div>
   </div>
+}
+
+const program = async () => {
+  const provider = await anchorProvider();
+  const program = new anchor.Program<SmartWallet>(
+    // @ts-expect-error
+    smartWalletIDL, provider);
+
+  return program;
 }
