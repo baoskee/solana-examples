@@ -18,9 +18,7 @@ pub mod smart_wallet {
         ctx: Context<'_, '_, 'c, 'info, Execute<'info>>, 
         data: Vec<u8>
     ) -> Result<()> {
-        let seeds = &[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]];
-        let signer_seeds = &[&seeds[..]];
-
+        let signer_seeds: &[&[&[u8]]] = &[&[ctx.accounts.wallet.authority.as_ref(), &[ctx.bumps.wallet]]];
         let mut accounts = ctx.remaining_accounts.iter().map(|a| {
             AccountMeta {
                 pubkey: a.key(),

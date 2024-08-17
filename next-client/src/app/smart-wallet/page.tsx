@@ -79,6 +79,11 @@ export default function SmartWalletPage() {
       })
       .remainingAccounts([
         {
+          pubkey: smartWalletAddr.data,
+          isSigner: false,
+          isWritable: true,
+        },
+        {
           pubkey: SystemProgram.programId,
           isSigner: false,
           isWritable: false,
