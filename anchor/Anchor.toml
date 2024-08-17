@@ -6,6 +6,7 @@ skip-lint = false
 
 [programs.localnet]
 anchor_counter = "ATiQvyCBXYGEB9PUu1TZGimuq8Bwp84WprsyTXMrMYn4"
+cpi-signer = "ANoX6SiPRLWY4SXVtLvfmpSG5Qg5bkAA9jS8e2XcmGTS"
 escrow = "HDP5Kn9C3eBeGLSFeV8fUnbFNgnMhAWK9eSEwwmXdSA7"
 pubkey-arg = "2hAqft8LyeYA6KZhptCjhLCLepdukDk8rk1TBAoAkDk2"
 reviews-variable-len = "LRxvkSm156Rk7CBss2vrYdBPXDnKXmJzgnjuYYtGZ1L"
