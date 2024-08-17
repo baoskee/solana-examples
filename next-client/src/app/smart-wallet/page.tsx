@@ -2,7 +2,7 @@
 import { useCallback, useMemo } from "react"
 import * as anchor from "@coral-xyz/anchor"
 import { anchorProvider } from "@/lib/util"
-import { SmartWallet, smartWalletIDL } from "anchor-local"
+import { ReviewsVariableLen, reviewsVariableLenIDL, SmartWallet, smartWalletIDL } from "anchor-local"
 import { useQuery } from "@tanstack/react-query"
 import { LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js"
 
@@ -119,6 +119,57 @@ export default function SmartWalletPage() {
     console.log(res);
   }, [smartWalletMeta, smartWalletAddr, smartWalletBalance])
 
+  /**
+   * Create movie review as the smart wallet.
+   */
+  const createMovieReview = useCallback(async () => {
+    const p = await program();
+    const pMovieReview = await movieReviewProgram();
+    if (!smartWalletAddr.data) return;
+
+    const inst = await pMovieReview.methods.addMovieReview(
+      "Pulp Fiction",
+      "A great movie",
+      5
+    )
+    .instruction();
+    const [movieReviewPda] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("Pulp Fiction"),
+        smartWalletAddr.data.toBuffer()
+      ],
+      pMovieReview.programId
+    );
+
+    const res = await p.methods.execute(inst.data)
+    .accounts({
+      authority: p.provider.publicKey,
+      walletMeta: smartWalletMeta.data,
+      wallet: smartWalletAddr.data,
+      instructionProgram: pMovieReview.programId,
+    })
+    .remainingAccounts([
+      {
+        pubkey: smartWalletAddr.data,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: movieReviewPda,
+        isSigner: false,
+        isWritable: true,
+      },
+      {
+        pubkey: SystemProgram.programId,
+        isSigner: false,
+        isWritable: false,
+      }
+    ])
+    .rpc();
+
+    console.log(res);
+  }, [smartWalletMeta, smartWalletAddr])
+
   return <div>
     <div className="flex flex-col gap-2 pb-4">
       <h1 className="text-2xl font-bold">Smart wallet Demo</h1>
@@ -133,6 +184,12 @@ export default function SmartWalletPage() {
       <button onClick={sendFromSmartWallet}>
         Send (decrement) 1 SOL from smart wallet
       </button>
+      <p>
+        Will be visible on movie review page.
+      </p>
+      <button onClick={createMovieReview}>
+        Create movie review
+      </button>
     </div>
   </div>
 }
@@ -142,6 +199,17 @@ const program = async () => {
   const program = new anchor.Program<SmartWallet>(
     // @ts-expect-error
     smartWalletIDL, provider);
+
+  return program;
+}
+
+const movieReviewProgram = async () => {
+  const provider = await anchorProvider();
+
+  const program = new anchor.Program<ReviewsVariableLen>(
+    // @ts-expect-error
+    reviewsVariableLenIDL, 
+    provider);
 
   return program;
 }
