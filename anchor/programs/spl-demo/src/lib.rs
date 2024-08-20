@@ -5,16 +5,13 @@ use anchor_spl::metadata::{
 use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::Metadata,
-    token::{Mint, Token, TokenAccount},
+    token::{Mint, Token, TokenAccount, mint_to, MintTo},
 };
 
 declare_id!("2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6");
 
 #[program]
 pub mod spl_demo {
-
-    use anchor_spl::token::{mint_to, MintTo};
-
     use super::*;
 
     // 1. create token with metadata
@@ -74,6 +71,13 @@ pub mod spl_demo {
         ).with_signer(signer_seeds);
 
         mint_to(mint_cpi, mint_amount)?;
+
+        ctx.accounts.state.set_inner(State {
+            mint_a: ctx.accounts.mint_a.key(),
+            mint_b: ctx.accounts.mint_b_funding.key(),
+            a_distributed_amount: 0,
+        });
+
         Ok(())
     }
 
@@ -123,6 +127,15 @@ pub struct Initialize<'info> {
     // funding mint for the token contract accepts
     pub mint_b_funding: Account<'info, Mint>,
 
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + State::INIT_SPACE,
+        seeds = [b"state".as_ref(), mint_a.key().as_ref()],
+        bump
+    )]
+    pub state: Account<'info, State>,
+
     // system programs
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -142,8 +155,13 @@ pub struct Redeem<'info> {
 
 // MARK: - State
 
+#[account]
 pub struct State {
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
     pub a_distributed_amount: u64,
+}
+
+impl State {
+    pub const INIT_SPACE: usize = 8 + 8 + 16;
 }
