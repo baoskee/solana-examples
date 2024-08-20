@@ -24,6 +24,9 @@ create-spl:
 # To get keypair being used: 
 # `solana config get`
 
+# for metadata program: 
+# solana program dump -u m metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s metaplex.so
+# solana-test-validator -r --bpf-program metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s metaplex.so
 
 mint token_addr amount:
   spl-token create-account {{token_addr}} || true

@@ -32,8 +32,8 @@ pub mod spl_demo {
             CreateMetadataAccountsV3 {
                 metadata: ctx.accounts.metadata_a.to_account_info(),
                 mint: ctx.accounts.mint_a.to_account_info(),
-                mint_authority: ctx.accounts.payer.to_account_info(),
-                update_authority: ctx.accounts.payer.to_account_info(),
+                mint_authority: ctx.accounts.mint_a.to_account_info(),
+                update_authority: ctx.accounts.mint_a.to_account_info(),
                 payer: ctx.accounts.payer.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
                 rent: ctx.accounts.rent.to_account_info(),
