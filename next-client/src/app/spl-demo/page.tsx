@@ -54,7 +54,6 @@ export default function SPLDemo() {
       // @ts-expect-error
       metadataA, 
       tokenMetadataProgram: METADATA_PROGRAM_ID,
-      state,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY

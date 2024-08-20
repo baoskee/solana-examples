@@ -236,12 +236,9 @@ pub struct Redeem<'info> {
 // MARK: - State
 
 #[account]
+#[derive(InitSpace)]
 pub struct State {
     pub mint_a: Pubkey,
     pub mint_b: Pubkey,
     pub a_distributed_amount: u64,
-}
-
-impl State {
-    pub const INIT_SPACE: usize = 8 + 8 + 16;
 }
