@@ -14,6 +14,8 @@ declare_id!("2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6");
 pub mod spl_demo {
     use super::*;
 
+    // MARK: - Initialize
+
     // 1. create token with metadata
     // 2. mint `mint_a` tokens to vault
     // 3. set state
@@ -54,12 +56,11 @@ pub mod spl_demo {
             None,  // Collection details
         )?;
 
+        let mint_a_key = ctx.accounts.mint_a.key();
         let signer_seeds: &[&[&[u8]]] = &[&[
-            b"mint",
-            token_name.as_bytes(),
-            token_symbol.as_bytes(),
-            token_uri.as_bytes(),
-            &[ctx.bumps.mint_a],
+            b"state",
+            mint_a_key.as_ref(),
+            &[ctx.bumps.state],
         ]];
         // 2. mint `mint_a` tokens to vault
         let mint_cpi = CpiContext::new(
@@ -83,6 +84,8 @@ pub mod spl_demo {
         Ok(())
     }
 
+    // MARK: - Redeem
+
     // @assume mint_a token has SAME PRECISION as mint_b token
     // 1. transfer funding tokens to contract
     // 2. transfer `mint_a` tokens from vault to user
@@ -100,15 +103,12 @@ pub mod spl_demo {
         transfer(transfer_cpi, amount)?;
 
         // 2. transfer `mint_a` tokens from vault to user
-        // @todo found design issue in signer_seeds
-        // must store variable length string in this case
-        // let signer_seeds: &[&[&[u8]]] = &[&[
-        //     b"mint",
-        //     token_name.as_bytes(),
-        //     token_symbol.as_bytes(),
-        //     token_uri.as_bytes(),
-        //     &[ctx.bumps.mint_a],
-        // ]];
+        let mint_a_key = ctx.accounts.mint_a.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"state",
+            mint_a_key.as_ref(),
+            &[ctx.bumps.state],
+        ]];
         let transfer_cpi = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
@@ -137,8 +137,6 @@ pub struct Initialize<'info> {
     // Create mint account
     #[account(
         init,
-        seeds = [b"mint".as_ref(), token_name.as_bytes(), token_symbol.as_bytes(), token_uri.as_bytes()],
-        bump,
         payer = payer,
         mint::decimals = 9,
         // tune this to your liking
@@ -146,6 +144,15 @@ pub struct Initialize<'info> {
         mint::freeze_authority = mint_a.key(),
     )]
     pub mint_a: Account<'info, Mint>,
+
+   #[account(
+        init,
+        payer = payer,
+        space = 8 + State::INIT_SPACE,
+        seeds = [b"state".as_ref(), mint_a.key().as_ref()],
+        bump
+    )]
+    pub state: Account<'info, State>,
 
     /// CHECK: This account is not initialized in this instruction
     #[account(
@@ -160,22 +167,13 @@ pub struct Initialize<'info> {
         init,
         payer = payer,
         associated_token::mint = mint_a,
-        associated_token::authority = mint_a,
+        associated_token::authority = state,
     )]
     // needs to mint tokens to this account to start
     pub vault_a: Account<'info, TokenAccount>,
 
     // funding mint for the token contract accepts
-    pub mint_b_funding: Account<'info, Mint>,
-
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + State::INIT_SPACE,
-        seeds = [b"state".as_ref(), mint_a.key().as_ref()],
-        bump
-    )]
-    pub state: Account<'info, State>,
+    pub mint_b_funding: Account<'info, Mint>, 
 
     // system programs
     pub system_program: Program<'info, System>,
@@ -208,13 +206,13 @@ pub struct Redeem<'info> {
     #[account(
         mut,
         associated_token::mint = mint_a,
-        associated_token::authority = mint_a,
+        associated_token::authority = state,
     )]
     pub vault_a: Account<'info, TokenAccount>,
    #[account(
         mut,
         associated_token::mint = mint_b,
-        associated_token::authority = mint_a,
+        associated_token::authority = state,
     )]
     pub vault_b: Account<'info, TokenAccount>,
 
