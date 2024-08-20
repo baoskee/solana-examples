@@ -12,6 +12,7 @@ deploy program:
 
 # MARK: - SPL 2022
 
+# see https://spl.solana.com/token-2022/extensions for metadata and other extensions
 create-spl:
   spl-token --program-id TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb create-token --enable-close
 

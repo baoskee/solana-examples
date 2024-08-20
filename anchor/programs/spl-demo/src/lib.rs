@@ -1,11 +1,19 @@
 use anchor_lang::prelude::*;
-use anchor_spl::metadata::{
-    create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
+use anchor_lang::solana_program::rent::{
+    DEFAULT_EXEMPTION_THRESHOLD, DEFAULT_LAMPORTS_PER_BYTE_YEAR,
 };
 use anchor_spl::{
     associated_token::AssociatedToken,
-    metadata::Metadata,
-    token::{Mint, Token, TokenAccount, mint_to, MintTo, Transfer, transfer},
+    token_interface::{
+        mint_to, token_metadata_initialize, transfer_checked, Mint, MintTo, Token, Token2022, TokenAccount,
+        TokenMetadataInitialize, Transfer, TokenMetadata,
+    },
+};
+use spl_token_metadata_interface::state::TokenMetadata;
+use spl_type_length_value::variable_len_pack::VariableLenPack;
+
+use anchor_lang::solana_program::system_program::{
+    transfer as system_transfer, Transfer as SystemTransfer,
 };
 
 declare_id!("2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6");
@@ -26,42 +34,46 @@ pub mod spl_demo {
         token_uri: String,
         mint_amount: u64, // in lamports
     ) -> Result<()> {
+        let token_metadata = TokenMetadata {
+            name: token_name.clone(),
+            symbol: token_symbol.clone(),
+            uri: token_uri.clone(),
+            ..Default::default()
+        };
+        // Add 4 extra bytes for size of MetadataExtension (2 bytes for type, 2 bytes for length)
+        let data_len = 4 + token_metadata.get_packed_len()?;
+        // Calculate lamports required for the additional metadata
+        let lamports =
+            data_len as u64 * DEFAULT_LAMPORTS_PER_BYTE_YEAR * DEFAULT_EXEMPTION_THRESHOLD as u64;
+
+        // Transfer additional lamports to mint account
+        system_transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                SystemTransfer {
+                    from: ctx.accounts.payer.to_account_info(),
+                    to: ctx.accounts.mint_a.to_account_info(),
+                },
+            ),
+            lamports,
+        )?;
+
         // 1. Invoking the create_metadata_account_v3 instruction on the token metadata program
         let cpi_context = CpiContext::new(
-            ctx.accounts.token_metadata_program.to_account_info(),
-            CreateMetadataAccountsV3 {
-                metadata: ctx.accounts.metadata_a.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+            TokenMetadataInitialize {
+                token_program_id: ctx.accounts.token_program.key(),
                 mint: ctx.accounts.mint_a.to_account_info(),
+                metadata: ctx.accounts.mint_a.to_account_info(),
                 mint_authority: ctx.accounts.mint_a.to_account_info(),
                 update_authority: ctx.accounts.mint_a.to_account_info(),
-                payer: ctx.accounts.payer.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-                rent: ctx.accounts.rent.to_account_info(),
             },
         );
 
-        create_metadata_accounts_v3(
-            cpi_context,
-            DataV2 {
-                name: token_name.clone(),
-                symbol: token_symbol.clone(),
-                uri: token_uri.clone(),
-                seller_fee_basis_points: 0,
-                creators: None,
-                collection: None,
-                uses: None,
-            },
-            false, // Is mutable
-            true,  // Update authority is signer
-            None,  // Collection details
-        )?;
+        token_metadata_initialize(cpi_context, token_name, token_symbol, token_uri)?;
 
         let mint_a_key = ctx.accounts.mint_a.key();
-        let signer_seeds: &[&[&[u8]]] = &[&[
-            b"state",
-            mint_a_key.as_ref(),
-            &[ctx.bumps.state],
-        ]];
+        let signer_seeds: &[&[&[u8]]] = &[&[b"state", mint_a_key.as_ref(), &[ctx.bumps.state]]];
         // 2. mint `mint_a` tokens to vault
         let mint_cpi = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -70,7 +82,8 @@ pub mod spl_demo {
                 to: ctx.accounts.vault_a.to_account_info(),
                 authority: ctx.accounts.mint_a.to_account_info(),
             },
-        ).with_signer(signer_seeds);
+        )
+        .with_signer(signer_seeds);
 
         mint_to(mint_cpi, mint_amount)?;
 
@@ -98,26 +111,23 @@ pub mod spl_demo {
                 from: ctx.accounts.payer_ata_b.to_account_info(),
                 to: ctx.accounts.vault_b.to_account_info(),
                 authority: ctx.accounts.payer.to_account_info(),
-            }
+            },
         );
-        transfer(transfer_cpi, amount)?;
+        transfer_checked(transfer_cpi, amount, ctx.accounts.mint_b.decimals)?;
 
         // 2. transfer `mint_a` tokens from vault to user
         let mint_a_key = ctx.accounts.mint_a.key();
-        let signer_seeds: &[&[&[u8]]] = &[&[
-            b"state",
-            mint_a_key.as_ref(),
-            &[ctx.bumps.state],
-        ]];
+        let signer_seeds: &[&[&[u8]]] = &[&[b"state", mint_a_key.as_ref(), &[ctx.bumps.state]]];
         let transfer_cpi = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.vault_a.to_account_info(),
                 to: ctx.accounts.payer_ata_a.to_account_info(),
                 authority: ctx.accounts.mint_a.to_account_info(),
-            }
-        ).with_signer(signer_seeds);
-        transfer(transfer_cpi, amount)?;
+            },
+        )
+        .with_signer(signer_seeds);
+        transfer_checked(transfer_cpi, amount, ctx.accounts.mint_a.decimals)?;
 
         // 3. update state
         let state = &mut ctx.accounts.state;
@@ -142,10 +152,12 @@ pub struct Initialize<'info> {
         // tune this to your liking
         mint::authority = mint_a.key(),
         mint::freeze_authority = mint_a.key(),
+        extensions::metadata_pointer::authority = mint_a.key(),
+        extensions::metadata_pointer::metadata_address = mint_a.key(),
     )]
-    pub mint_a: Account<'info, Mint>,
+    pub mint_a: InterfaceAccount<'info, Mint>,
 
-   #[account(
+    #[account(
         init,
         payer = payer,
         space = 8 + State::INIT_SPACE,
@@ -154,15 +166,6 @@ pub struct Initialize<'info> {
     )]
     pub state: Account<'info, State>,
 
-    /// CHECK: This account is not initialized in this instruction
-    #[account(
-        mut,
-        seeds = [b"metadata".as_ref(), token_metadata_program.key().as_ref(), mint_a.key().as_ref()],
-        bump,
-        seeds::program = token_metadata_program.key(),
-    )]
-    pub metadata_a: UncheckedAccount<'info>,
-
     #[account(
         init,
         payer = payer,
@@ -170,17 +173,15 @@ pub struct Initialize<'info> {
         associated_token::authority = state,
     )]
     // needs to mint tokens to this account to start
-    pub vault_a: Account<'info, TokenAccount>,
+    pub vault_a: InterfaceAccount<'info, TokenAccount>,
 
     // funding mint for the token contract accepts
-    pub mint_b_funding: Account<'info, Mint>, 
+    pub mint_b_funding: InterfaceAccount<'info, Mint>,
 
     // system programs
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
+    pub token_program: Program<'info, Token2022>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub token_metadata_program: Program<'info, Metadata>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 // MARK: - Redeem accounts
@@ -190,9 +191,9 @@ pub struct Redeem<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account()]
-    pub mint_a: Account<'info, Mint>,
+    pub mint_a: InterfaceAccount<'info, Mint>,
     #[account()]
-    pub mint_b: Account<'info, Mint>,
+    pub mint_b: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -208,29 +209,29 @@ pub struct Redeem<'info> {
         associated_token::mint = mint_a,
         associated_token::authority = state,
     )]
-    pub vault_a: Account<'info, TokenAccount>,
-   #[account(
+    pub vault_a: InterfaceAccount<'info, TokenAccount>,
+    #[account(
         mut,
         associated_token::mint = mint_b,
         associated_token::authority = state,
     )]
-    pub vault_b: Account<'info, TokenAccount>,
+    pub vault_b: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
         associated_token::mint = mint_b,
         associated_token::authority = payer,
     )]
-    pub payer_ata_b: Account<'info, TokenAccount>,
+    pub payer_ata_b: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
         mut,
         associated_token::mint = mint_a,
         associated_token::authority = payer,
     )]
-    pub payer_ata_a: Account<'info, TokenAccount>, 
+    pub payer_ata_a: InterfaceAccount<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Program<'info, TokenInterface>,
 }
 
 // MARK: - State

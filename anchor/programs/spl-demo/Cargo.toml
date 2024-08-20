@@ -16,6 +16,14 @@ no-idl = []
 no-log-ix-name = []
 idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 
+# https://solana.stackexchange.com/questions/15756/totally-blocked-by-expected-solana-programprogram-errorprogramerror
 [dependencies]
 anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
-anchor-spl = { version = "0.30.1", features = ["metadata"] }
+anchor-spl = { version = "0.30.1" }
+session-keys = { version = "2.0.5", features = ["no-entrypoint"] }
+solana-program = "1.18"
+spl-token-2022 = { version = "3.0.4", features = [ "no-entrypoint" ] }
+spl-token = { version = "4.0.3", features = [ "no-entrypoint" ] }
+spl-token-metadata-interface = { version = "0.3.5"}
+spl-type-length-value = "0.4.6"
+spl-program-error = "0.4.4"
