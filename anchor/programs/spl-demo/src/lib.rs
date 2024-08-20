@@ -5,7 +5,7 @@ use anchor_spl::metadata::{
 use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::Metadata,
-    token::{Mint, Token, TokenAccount, mint_to, MintTo},
+    token::{Mint, Token, TokenAccount, mint_to, MintTo, Transfer, transfer},
 };
 
 declare_id!("2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6");
@@ -16,6 +16,7 @@ pub mod spl_demo {
 
     // 1. create token with metadata
     // 2. mint `mint_a` tokens to vault
+    // 3. set state
     pub fn initialize(
         ctx: Context<Initialize>,
         token_name: String,
@@ -72,6 +73,7 @@ pub mod spl_demo {
 
         mint_to(mint_cpi, mint_amount)?;
 
+        // 3. set state
         ctx.accounts.state.set_inner(State {
             mint_a: ctx.accounts.mint_a.key(),
             mint_b: ctx.accounts.mint_b_funding.key(),
@@ -81,12 +83,51 @@ pub mod spl_demo {
         Ok(())
     }
 
+    // @assume mint_a token has SAME PRECISION as mint_b token
     // 1. transfer funding tokens to contract
     // 2. transfer `mint_a` tokens from vault to user
+    // 3. update state
     pub fn redeem(ctx: Context<Redeem>, amount: u64) -> Result<()> {
+        // 1. transfer funding tokens to contract
+        let transfer_cpi = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.payer_ata_b.to_account_info(),
+                to: ctx.accounts.vault_b.to_account_info(),
+                authority: ctx.accounts.payer.to_account_info(),
+            }
+        );
+        transfer(transfer_cpi, amount)?;
+
+        // 2. transfer `mint_a` tokens from vault to user
+        // @todo found design issue in signer_seeds
+        // must store variable length string in this case
+        // let signer_seeds: &[&[&[u8]]] = &[&[
+        //     b"mint",
+        //     token_name.as_bytes(),
+        //     token_symbol.as_bytes(),
+        //     token_uri.as_bytes(),
+        //     &[ctx.bumps.mint_a],
+        // ]];
+        let transfer_cpi = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.vault_a.to_account_info(),
+                to: ctx.accounts.payer_ata_a.to_account_info(),
+                authority: ctx.accounts.mint_a.to_account_info(),
+            }
+        ).with_signer(signer_seeds);
+        transfer(transfer_cpi, amount)?;
+
+        // 3. update state
+        let state = &mut ctx.accounts.state;
+        state.a_distributed_amount += amount;
+
         Ok(())
     }
 }
+
+// MARK: - Initialize accounts
 
 #[derive(Accounts)]
 #[instruction(token_name: String, token_symbol: String, token_uri: String)]
@@ -144,13 +185,54 @@ pub struct Initialize<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
+// MARK: - Redeem accounts
+
 #[derive(Accounts)]
 pub struct Redeem<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-
+    #[account()]
     pub mint_a: Account<'info, Mint>,
+    #[account()]
     pub mint_b: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        seeds = [b"state".as_ref(), mint_a.key().as_ref()],
+        bump,
+        has_one = mint_a,
+        has_one = mint_b,
+    )]
+    pub state: Account<'info, State>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint_a,
+        associated_token::authority = mint_a,
+    )]
+    pub vault_a: Account<'info, TokenAccount>,
+   #[account(
+        mut,
+        associated_token::mint = mint_b,
+        associated_token::authority = mint_a,
+    )]
+    pub vault_b: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint_b,
+        associated_token::authority = payer,
+    )]
+    pub payer_ata_b: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint_a,
+        associated_token::authority = payer,
+    )]
+    pub payer_ata_a: Account<'info, TokenAccount>, 
+
+    pub token_program: Program<'info, Token>,
 }
 
 // MARK: - State
