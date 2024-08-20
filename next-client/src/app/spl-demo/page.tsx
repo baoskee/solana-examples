@@ -53,6 +53,7 @@ export default function SPLDemo() {
       mintBFunding: FUNDING_MINT,
       // @ts-expect-error
       metadataA, 
+      state,
       tokenMetadataProgram: METADATA_PROGRAM_ID,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
