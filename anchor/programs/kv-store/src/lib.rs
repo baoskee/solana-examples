@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("CGKtFz7Vp3R1eruPU5VGvAFVQJn2WpR5Xo5hysYcKhzj");
+declare_id!("9K8fZ2ZFgyjtUr9tJkDgwAPcs6wCjpHBLrh989JeevB9");
 
 #[program]
 pub mod kv_store {
