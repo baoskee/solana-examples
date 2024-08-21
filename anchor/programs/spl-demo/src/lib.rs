@@ -114,7 +114,7 @@ pub mod spl_demo {
             Transfer {
                 from: ctx.accounts.vault_a.to_account_info(),
                 to: ctx.accounts.payer_ata_a.to_account_info(),
-                authority: ctx.accounts.mint_a.to_account_info(),
+                authority: ctx.accounts.state.to_account_info(),
             }
         ).with_signer(signer_seeds);
 
