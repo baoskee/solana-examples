@@ -24,7 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 const FUNDING_MINT = NATIVE_MINT;
 const METADATA_PROGRAM_ID = new PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s");
 
-const MINT_A_DEFAULT = "2H8JywEZo9BFnUer7LzbYZsggLKUyESsZsjy89kb35hX"
+const MINT_A_DEFAULT = "GP3kMu8caqH6QZXMwpekCoyBY2WAGjK89Pjit8jRebZn"
 /**
  * - Create token and specify funding mint
  */
@@ -155,28 +155,48 @@ export default function SPLDemo() {
         NATIVE_MINT
       );
 
-      // 2. 
-      const vault_a = createAssociatedTokenAccountIdempotentInstruction(
+      // 2. create ATAs for all necessary accounts
+      const vaultA =
+        await getAssociatedTokenAddress(new PublicKey(mintAAddr), state, true, TOKEN_PROGRAM_ID);
+
+      console.log(vaultA.toBase58())
+      console.log(
+        PublicKey.findProgramAddressSync(
+          [
+            state.toBuffer(),
+            TOKEN_PROGRAM_ID.toBuffer(),
+            new PublicKey(mintAAddr).toBuffer(),
+          ],
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        )[0].toBase58());
+
+      const createVaultA = createAssociatedTokenAccountIdempotentInstruction(
         p.provider.publicKey,
-        await getAssociatedTokenAddress(new PublicKey(mintAAddr), state, true),
+        vaultA,
         state, // owner
         new PublicKey(mintAAddr), // mint
       )
-      const vault_b = createAssociatedTokenAccountIdempotentInstruction(
+
+      const vaultB = await getAssociatedTokenAddress(NATIVE_MINT, state, true, TOKEN_PROGRAM_ID);
+      const createVaultB = createAssociatedTokenAccountIdempotentInstruction(
         p.provider.publicKey,
-        await getAssociatedTokenAddress(p.provider.publicKey, state, true),
+        vaultB,
         state, // owner
         NATIVE_MINT, // mint
       );
-      const payer_ata_a = createAssociatedTokenAccountIdempotentInstruction(
+      const createPayerAtaA = createAssociatedTokenAccountIdempotentInstruction(
         p.provider.publicKey,
-        await getAssociatedTokenAddress(p.provider.publicKey, state, true),
+        await getAssociatedTokenAddress(
+          new PublicKey(mintAAddr), 
+          p.provider.publicKey, 
+          true
+        ),
         p.provider.publicKey, // owner
         new PublicKey(mintAAddr), // mint
-      ) 
+      )
 
       // 3. compose redeem instruction
-      const inst = await p.methods.redeem(
+      const redeemInst = await p.methods.redeem(
         reedemAmount
       ).accounts({
         payer: p.provider.publicKey,
@@ -185,8 +205,7 @@ export default function SPLDemo() {
         mintB: new PublicKey(NATIVE_MINT),
         state,
       }).instruction();
-
-      const transaction = new Transaction().add(
+      const allInstructions = [
         createWSolAta,
         SystemProgram.transfer({
           fromPubkey: p.provider.publicKey,
@@ -194,11 +213,12 @@ export default function SPLDemo() {
           lamports: reedemAmount.toNumber(),
         }),
         createSyncNativeInstruction(wrappedSOLata),
-        vault_a,
-        vault_b,
-        payer_ata_a,
-        inst
-      );
+        createVaultA,
+        createVaultB,
+        createPayerAtaA,
+        redeemInst
+      ];
+      const transaction = new Transaction().add(...allInstructions);
 
       const signature = await p.provider.sendAndConfirm!(transaction);
       console.log(signature);

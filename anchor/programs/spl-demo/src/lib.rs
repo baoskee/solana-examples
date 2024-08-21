@@ -117,6 +117,7 @@ pub mod spl_demo {
                 authority: ctx.accounts.mint_a.to_account_info(),
             }
         ).with_signer(signer_seeds);
+
         transfer(transfer_cpi, amount)?;
 
         // 3. update state
