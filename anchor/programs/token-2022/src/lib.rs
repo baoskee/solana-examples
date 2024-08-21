@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::rent::{
     DEFAULT_EXEMPTION_THRESHOLD, DEFAULT_LAMPORTS_PER_BYTE_YEAR
 };
-use anchor_spl::token_interface::{Mint, Token2022, token_metadata_initialize, TokenMetadataInitialize};
+use anchor_spl::token_interface::{token_metadata_initialize, Mint, Token2022, TokenAccount, TokenMetadataInitialize};
 use anchor_lang::system_program::{transfer, Transfer};
 use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
@@ -11,8 +11,6 @@ declare_id!("QJqxGatfoyyHgeuxNgur5EWETdXGzYx2hBkdtrbT2gZ");
 
 #[program]
 pub mod token_2022 {
-
-
     use super::*;
 
     pub fn initialize(
@@ -77,4 +75,24 @@ pub struct Initialize<'info> {
     // must be token-2022 for metadata extension
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct TransferToken<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    #[account(mut)]
+    pub from: InterfaceAccount<'info, TokenAccount>,
+    pub to_authority: SystemAccount<'info>,
+    #[account(
+        // init here will throw error if account already exists
+        // init will also require system program and associated_token program
+        mut, 
+        associated_token::mint = mint,
+        associated_token::authority = to_authority,
+    )]
+    pub to: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Program<'info, Token2022>,
 }
