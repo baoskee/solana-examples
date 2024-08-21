@@ -5,9 +5,9 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-anchor_counter = "ATiQvyCBXYGEB9PUu1TZGimuq8Bwp84WprsyTXMrMYn4"
+anchor_counter = "8sbbinVKBHTxWBd1oDrjUnHY9GqB2QJJq4YeUdPnnVM6"
 cpi-signer = "ANoX6SiPRLWY4SXVtLvfmpSG5Qg5bkAA9jS8e2XcmGTS"
-escrow = "HDP5Kn9C3eBeGLSFeV8fUnbFNgnMhAWK9eSEwwmXdSA7"
+escrow = "3VXioM77xHLhNycAN4pkpHAsp6hZyDxnSieKQd7Kyt8r"
 pubkey-arg = "2hAqft8LyeYA6KZhptCjhLCLepdukDk8rk1TBAoAkDk2"
 reviews-variable-len = "LRxvkSm156Rk7CBss2vrYdBPXDnKXmJzgnjuYYtGZ1L"
 smart-wallet = "BKhDWiNiM9ZEo3Deyf7MmfDMyDYwLeGLagorJ5GtV8XC"
