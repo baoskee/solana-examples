@@ -48,6 +48,12 @@ export default function Token2022Page() {
     tokenMetadata.refetch()
   }, [tokenMetadata]);
 
+  const transferToken = useCallback(async () => {
+    const p = await program()
+
+
+  }, [])
+
   return (
     <div className="flex flex-col gap-4">
       <h1>Token2022Page</h1>
@@ -62,6 +68,9 @@ export default function Token2022Page() {
       </div>
       <button onClick={createToken}>
         Create Token
+      </button>
+      <button>
+        Transfer token
       </button>
     </div>
   );

@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::rent::{
     DEFAULT_EXEMPTION_THRESHOLD, DEFAULT_LAMPORTS_PER_BYTE_YEAR
 };
-use anchor_spl::token_interface::{token_metadata_initialize, Mint, Token2022, TokenAccount, TokenMetadataInitialize};
-use anchor_lang::system_program::{transfer, Transfer};
+use anchor_spl::token_interface::{token_metadata_initialize, Mint, Token2022, TokenAccount, TokenMetadataInitialize, 
+    TransferChecked, transfer_checked, MintTo, mint_to};
+use anchor_lang::system_program::{transfer as system_transfer, Transfer as SystemTransfer};
 use spl_token_metadata_interface::state::TokenMetadata;
 use spl_type_length_value::variable_len_pack::VariableLenPack;
 
@@ -32,10 +33,10 @@ pub mod token_2022 {
         let lamports =
             data_len as u64 * DEFAULT_LAMPORTS_PER_BYTE_YEAR * DEFAULT_EXEMPTION_THRESHOLD as u64;
         // transfer additional lamports to the mint account
-        transfer(
+        system_transfer(
             CpiContext::new(
                 ctx.accounts.system_program.to_account_info(),
-                Transfer {
+                SystemTransfer {
                     from: ctx.accounts.signer.to_account_info(),
                     to: ctx.accounts.mint.to_account_info(),
                 }
@@ -53,6 +54,48 @@ pub mod token_2022 {
             }
         );
         token_metadata_initialize(ctx, name, symbol, uri)?;
+        Ok(())
+    }
+
+    // MARK: - Mint Token
+    pub fn mint_token(
+        ctx: Context<MintToken>,
+        amount: u64,
+    ) -> Result<()> {
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.vault.to_account_info(),
+                authority: ctx.accounts.signer.to_account_info(),
+            }
+        );
+        mint_to(cpi_ctx, amount)?;
+        Ok(())
+    }
+
+    // MARK: - Transfer Token
+    pub fn transfer_token(
+        ctx: Context<TransferToken>,
+        amount: u64,
+    ) -> Result<()> {
+        let mint_key = ctx.accounts.mint.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"vault",
+            mint_key.as_ref(),
+            &[ctx.bumps.from_vault]
+        ]];
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.from_vault.to_account_info(),
+                to: ctx.accounts.to.to_account_info(),
+                authority: ctx.accounts.signer.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+            }
+        ).with_signer(signer_seeds);
+
+        transfer_checked(cpi_ctx, amount, ctx.accounts.mint.decimals)?;
         Ok(())
     }
 }
@@ -78,13 +121,37 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
+pub struct MintToken<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        seeds = [b"vault", mint.key().as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = vault,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+    pub token_program: Program<'info, Token2022>,
+}
+
+#[derive(Accounts)]
 pub struct TransferToken<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     pub mint: InterfaceAccount<'info, Mint>,
 
-    #[account(mut)]
-    pub from: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        seeds = [b"vault", mint.key().as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = from_vault,
+    )]
+    pub from_vault: InterfaceAccount<'info, TokenAccount>,
+
     pub to_authority: SystemAccount<'info>,
     #[account(
         // init here will throw error if account already exists
