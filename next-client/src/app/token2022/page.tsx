@@ -2,8 +2,8 @@
 
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { getMint, getTokenMetadata, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAccount, getAssociatedTokenAddress, getMint, getTokenMetadata, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Token2022, token2022IDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -40,6 +40,47 @@ export default function Token2022Page() {
       }
     },
   });
+
+  const vaultBalance = useQuery({
+    queryKey: ["vault-balance", mint],
+    queryFn: async () => {
+      const p = await program()
+      const [vaultAddr] = PublicKey.findProgramAddressSync(
+        [Buffer.from("vault"), (new PublicKey(mint)).toBuffer()],
+        p.programId,
+      );
+      const account = await getAccount(
+        p.provider.connection,
+        vaultAddr,
+        undefined,
+        TOKEN_2022_PROGRAM_ID,
+      );
+      return Number(account.amount) / LAMPORTS_PER_SOL
+    }
+  })
+
+  const walletTokenBalance = useQuery({
+    queryKey: ["wallet-token-balance", mint],
+    queryFn: async () => {
+      const p = await program()
+      const [tokenAddr] = PublicKey.findProgramAddressSync(
+        [
+          p.provider.publicKey!.toBuffer(),
+          TOKEN_2022_PROGRAM_ID.toBuffer(),
+          (new PublicKey(mint)).toBuffer(),
+        ],
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+      )
+
+      const account = await getAccount(
+        p.provider.connection,
+        tokenAddr,
+        undefined,
+        TOKEN_2022_PROGRAM_ID,
+      )
+      return Number(account.amount) / LAMPORTS_PER_SOL
+    }
+  })
 
   const createToken = useCallback(async () => {
     const p = await program()
@@ -87,9 +128,54 @@ export default function Token2022Page() {
 
   const transferToken = useCallback(async () => {
     const p = await program()
+    if (!p.provider.publicKey) return;
+    if (!mint) return;
+    const [vault] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), (new PublicKey(mint)).toBuffer()],
+      p.programId,
+    )
+    const [ata] = PublicKey.findProgramAddressSync(
+      [p.provider.publicKey.toBuffer(), TOKEN_2022_PROGRAM_ID.toBuffer(), (new PublicKey(mint)).toBuffer()],
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+    )
+    console.log("ata: ", ata.toBase58())
+    const ata2 = await getAssociatedTokenAddress(
+      new PublicKey(mint),
+      p.provider.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID,
+    )
+    console.log("ata2: ", ata2.toBase58())
+    const createToAta = await createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      new PublicKey(ata),
+      p.provider.publicKey,
+      new PublicKey(mint),
+      TOKEN_2022_PROGRAM_ID,
+    );
+    const transferInst = await p.methods.transferToken(new BN(1 * LAMPORTS_PER_SOL))
+      .accounts({
+        signer: p.provider.publicKey,
+        mint: new PublicKey(mint),
+        // @ts-ignore
+        fromVault: vault,
+        toAuthority: p.provider.publicKey,
+        to: ata,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .instruction()
+    const sig = await p.provider.sendAndConfirm!(
+      new Transaction().add(createToAta, transferInst)
+    )
 
-
-  }, [])
+    console.log("sig: ", sig)
+    vaultBalance.refetch()
+    walletTokenBalance.refetch()
+  }, [
+    mint,
+    vaultBalance,
+    walletTokenBalance,
+  ])
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,14 +191,18 @@ export default function Token2022Page() {
           </div>
         </div>
       </div>
+      <div>
+        <p>Vault balance: {vaultBalance.data}</p>
+        <p>Wallet token balance: {walletTokenBalance.data}</p>
+      </div>
       <button onClick={createToken}>
         Create Token
       </button>
       <button onClick={mintToken}>
         Mint 100 tokens
       </button>
-      <button>
-        Transfer token
+      <button onClick={transferToken}>
+        Transfer 1 token from vault to wallet
       </button>
     </div>
   );

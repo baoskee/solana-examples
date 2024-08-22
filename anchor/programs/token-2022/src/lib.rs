@@ -171,7 +171,7 @@ pub struct TransferToken<'info> {
         // init will also require system program and associated_token program
         mut, 
         associated_token::mint = mint,
-        associated_token::authority = to_authority,
+        associated_token::authority = to_authority.key(),
     )]
     pub to: InterfaceAccount<'info, TokenAccount>,
     pub token_program: Program<'info, Token2022>,
