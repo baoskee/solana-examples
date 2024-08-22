@@ -144,6 +144,7 @@ export default function Token2022Page() {
       p.provider.publicKey,
       false,
       TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
     )
     console.log("ata2: ", ata2.toBase58())
     const createToAta = await createAssociatedTokenAccountIdempotentInstruction(
@@ -152,6 +153,7 @@ export default function Token2022Page() {
       p.provider.publicKey,
       new PublicKey(mint),
       TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
     );
     const transferInst = await p.methods.transferToken(new BN(1 * LAMPORTS_PER_SOL))
       .accounts({
@@ -162,6 +164,7 @@ export default function Token2022Page() {
         toAuthority: p.provider.publicKey,
         to: ata,
         tokenProgram: TOKEN_2022_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       })
       .instruction()
     const sig = await p.provider.sendAndConfirm!(

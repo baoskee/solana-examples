@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::rent::{
     DEFAULT_EXEMPTION_THRESHOLD, DEFAULT_LAMPORTS_PER_BYTE_YEAR
 };
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{token_metadata_initialize, Mint, Token2022, TokenAccount, TokenMetadataInitialize, 
     TransferChecked, transfer_checked, MintTo, mint_to};
 use anchor_lang::system_program::{transfer as system_transfer, Transfer as SystemTransfer};
@@ -79,6 +80,11 @@ pub mod token_2022 {
         ctx: Context<TransferToken>,
         amount: u64,
     ) -> Result<()> {
+        msg!("to_authority: {}", ctx.accounts.to_authority.key().to_string());
+        msg!("from_vault: {}", ctx.accounts.from_vault.key().to_string());
+        msg!("mint: {}", ctx.accounts.mint.key().to_string());
+        msg!("to: {}", ctx.accounts.to.key().to_string());
+
         let mint_key = ctx.accounts.mint.key();
         let signer_seeds: &[&[&[u8]]] = &[&[
             b"vault",
@@ -90,7 +96,7 @@ pub mod token_2022 {
             TransferChecked {
                 from: ctx.accounts.from_vault.to_account_info(),
                 to: ctx.accounts.to.to_account_info(),
-                authority: ctx.accounts.signer.to_account_info(),
+                authority: ctx.accounts.from_vault.to_account_info(),
                 mint: ctx.accounts.mint.to_account_info(),
             }
         ).with_signer(signer_seeds);
@@ -171,8 +177,13 @@ pub struct TransferToken<'info> {
         // init will also require system program and associated_token program
         mut, 
         associated_token::mint = mint,
-        associated_token::authority = to_authority.key(),
+        associated_token::authority = to_authority,
+        associated_token::token_program = token_program,
     )]
     pub to: InterfaceAccount<'info, TokenAccount>,
+
     pub token_program: Program<'info, Token2022>,
+    // CAUTION: If you don't specify the associated token program,
+    // the `to` ATA will be different from the ATA created by the client
+    pub associated_token_program: Program<'info, AssociatedToken>,
 }
