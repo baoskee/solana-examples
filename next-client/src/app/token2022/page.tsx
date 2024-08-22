@@ -1,14 +1,14 @@
 "use client"
 
 import { anchorProvider } from "@/lib/util";
-import { Program } from "@coral-xyz/anchor";
+import { BN, Program } from "@coral-xyz/anchor";
 import { getTokenMetadata, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Token2022, token2022IDL } from "anchor-local";
 import { useCallback, useState } from "react";
 
-const DEFAULT_MINT = "FuvmeVQtYvyxbP9P6G8NJkhtgPcdLZhM1TpFEZdvANxw"
+const DEFAULT_MINT = "33RnJppcow7XD12jyXoGztSbSTzyH2J7rJaDL2fXY4rP"
 
 export default function Token2022Page() {
   const [mint, setMint] = useState<string>(DEFAULT_MINT)
@@ -18,7 +18,7 @@ export default function Token2022Page() {
       const p = await program()
 
       const metadata = await getTokenMetadata(
-        p.provider.connection, 
+        p.provider.connection,
         new PublicKey(mint!),
       )
       return metadata
@@ -40,13 +40,35 @@ export default function Token2022Page() {
       systemProgram: SystemProgram.programId,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
     })
-    .signers([_mint])
-    .rpc()
+      .signers([_mint])
+      .rpc()
     console.log("sig: ", sig)
 
     setMint(_mint.publicKey.toString())
     tokenMetadata.refetch()
   }, [tokenMetadata]);
+
+  const mintToken = useCallback(async () => {
+    if (!mint) return;
+    const p = await program();
+    const [vault] = PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), new PublicKey(mint).toBuffer()],
+      p.programId,
+    );
+
+    const sig = await p.methods.mintToken(new BN(100 * LAMPORTS_PER_SOL))
+      .accounts({
+        signer: p.provider.publicKey,
+        mint: new PublicKey(mint),
+        // @ts-ignore
+        vault,
+        // @ts-ignore
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+      })
+      .rpc();
+      console.log("sig: ", sig)
+  }, [mint])
 
   const transferToken = useCallback(async () => {
     const p = await program()
@@ -62,12 +84,15 @@ export default function Token2022Page() {
         <div>
           <div>Token metadata: <pre>
             {JSON.stringify(tokenMetadata.data, null, 2)}
-            </pre>
+          </pre>
           </div>
-          </div>
+        </div>
       </div>
       <button onClick={createToken}>
         Create Token
+      </button>
+      <button onClick={mintToken}>
+        Mint 100 tokens
       </button>
       <button>
         Transfer token

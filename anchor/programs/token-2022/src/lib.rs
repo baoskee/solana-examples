@@ -127,14 +127,17 @@ pub struct MintToken<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        mut,
+        init,
+        payer = signer,
         seeds = [b"vault", mint.key().as_ref()],
         bump,
         token::mint = mint,
         token::authority = vault,
     )]
     pub vault: InterfaceAccount<'info, TokenAccount>,
+
     pub token_program: Program<'info, Token2022>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
