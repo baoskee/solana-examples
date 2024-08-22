@@ -61,7 +61,7 @@ pub mod token_2022 {
     pub fn mint_token(
         ctx: Context<MintToken>,
         amount: u64,
-    ) -> Result<()> {
+    ) -> Result<()> { 
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             MintTo {
@@ -115,6 +115,16 @@ pub struct Initialize<'info> {
     )]
     pub mint: InterfaceAccount<'info, Mint>,
 
+    #[account(
+        init,
+        payer = signer,
+        seeds = [b"vault", mint.key().as_ref()],
+        bump,
+        token::mint = mint,
+        token::authority = vault,
+    )]
+    pub vault: InterfaceAccount<'info, TokenAccount>,
+
     // must be token-2022 for metadata extension
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
@@ -127,8 +137,7 @@ pub struct MintToken<'info> {
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
-        init,
-        payer = signer,
+        mut,
         seeds = [b"vault", mint.key().as_ref()],
         bump,
         token::mint = mint,

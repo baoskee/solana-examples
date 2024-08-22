@@ -2,28 +2,43 @@
 
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { getTokenMetadata, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import { getMint, getTokenMetadata, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Token2022, token2022IDL } from "anchor-local";
 import { useCallback, useState } from "react";
 
-const DEFAULT_MINT = "33RnJppcow7XD12jyXoGztSbSTzyH2J7rJaDL2fXY4rP"
+const DEFAULT_MINT = "2MXzwUyacJQ6EoDZaDT13CCcMi1uDYdjgy56aoz3rXfT"
 
 export default function Token2022Page() {
   const [mint, setMint] = useState<string>(DEFAULT_MINT)
   const tokenMetadata = useQuery({
-    queryKey: ["token-metadata"],
+    queryKey: ["token-metadata", mint],
     queryFn: async () => {
-      const p = await program()
+      try {
+        console.log("mint: ", mint)
+        const p = await program()
 
-      const metadata = await getTokenMetadata(
-        p.provider.connection,
-        new PublicKey(mint!),
-      )
-      return metadata
+        const metadata = await getTokenMetadata(
+          p.provider.connection,
+          new PublicKey(mint!),
+        )
+        const mintInfo = await getMint(
+          p.provider.connection,
+          new PublicKey(mint!),
+          undefined,
+          TOKEN_2022_PROGRAM_ID,
+        );
+        console.log("mintInfo: ", mintInfo)
+
+        return {
+          ...metadata,
+          mintAuthority: mintInfo.mintAuthority?.toBase58(),
+        }
+      } catch (e) {
+        console.log("error: ", e)
+      }
     },
-    enabled: !!mint,
   });
 
   const createToken = useCallback(async () => {
@@ -44,7 +59,7 @@ export default function Token2022Page() {
       .rpc()
     console.log("sig: ", sig)
 
-    setMint(_mint.publicKey.toString())
+    setMint(_mint.publicKey.toBase58())
     tokenMetadata.refetch()
   }, [tokenMetadata]);
 
@@ -52,7 +67,7 @@ export default function Token2022Page() {
     if (!mint) return;
     const p = await program();
     const [vault] = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), new PublicKey(mint).toBuffer()],
+      [Buffer.from("vault"), (new PublicKey(mint)).toBuffer()],
       p.programId,
     );
 
@@ -67,7 +82,7 @@ export default function Token2022Page() {
         tokenProgram: TOKEN_2022_PROGRAM_ID,
       })
       .rpc();
-      console.log("sig: ", sig)
+    console.log("sig: ", sig)
   }, [mint])
 
   const transferToken = useCallback(async () => {
@@ -83,7 +98,9 @@ export default function Token2022Page() {
         <p>Token mint: {mint}</p>
         <div>
           <div>Token metadata: <pre>
-            {JSON.stringify(tokenMetadata.data, null, 2)}
+            {JSON.stringify(tokenMetadata.data, (key, value) =>
+              typeof value === 'bigint' ? value.toString() : value
+            , 2)}
           </pre>
           </div>
         </div>
