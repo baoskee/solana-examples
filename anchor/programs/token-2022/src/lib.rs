@@ -134,6 +134,7 @@ pub struct Initialize<'info> {
 pub struct MintToken<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+    #[account(mut)]
     pub mint: InterfaceAccount<'info, Mint>,
 
     #[account(
