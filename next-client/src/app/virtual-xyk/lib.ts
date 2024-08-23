@@ -37,8 +37,8 @@ export const sol_out = (
 }
 
 export type ExecuteMsg =
-  | { type: "buy", amount: bigint, user_pubkey: string }
-  | { type: "sell", amount: bigint, user_pubkey: string }
+  | { type: "buy", amount: bigint }
+  | { type: "sell", amount: bigint }
 
 export type ContractState = {
   curve: Curve;
