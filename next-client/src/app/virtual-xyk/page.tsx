@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Curve, execute_state_transition } from "./lib";
+import { useCallback, useMemo, useState } from "react";
+import { Curve, execute_state_transition, sol_out, token_out } from "./lib";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { token } from "@coral-xyz/anchor/dist/cjs/utils";
 
 
 const USD_PER_SOL = 100;
 
 export default function VirtualXykPage() {
   const [curve, setCurve] = useState<Curve>({
-    token_amount: BigInt(1e18), // 1 billion in lamports
+    token_amount: BigInt(1e9 * LAMPORTS_PER_SOL), // 1 billion in lamports
     virtual_sol_amount: BigInt(50 * LAMPORTS_PER_SOL), // 5K market cap = 50 SOL 
     actual_sol_amount: BigInt(0),
     distributed_token_amount: BigInt(0),
@@ -25,6 +26,16 @@ export default function VirtualXykPage() {
 
     setCurve(state.curve);
   }, [curve, buyAmount])
+
+  const youReceiveBuy = useMemo(() =>
+    Number(token_out(curve, BigInt(buyAmount * LAMPORTS_PER_SOL)))
+    / LAMPORTS_PER_SOL
+    , [curve, buyAmount])
+
+  const youReceiveSell = useMemo(() =>
+    Number(sol_out(curve, BigInt(sellAmount * LAMPORTS_PER_SOL)))
+    / LAMPORTS_PER_SOL
+    , [curve, sellAmount])
 
   const onSellClick = useCallback(() => {
     const state = execute_state_transition(
@@ -45,25 +56,33 @@ export default function VirtualXykPage() {
         , 2)}</pre>
     </div>
 
-    <div className="py-2 flex gap-2">
+    <div className="py-2 flex gap-2 items-center">
+      <p>
+        You pay in SOL:
+      </p>
       <input type="number"
-        className="px-4 bg-slate-600 rounded-lg"
+        className="px-4 bg-slate-600 rounded-lg py-2"
         value={buyAmount}
         onChange={(e) => setBuyAmount(Number(e.target.value))}
       />
       <button onClick={onBuyClick}>
         Buy
       </button>
+      <p>You receive: {youReceiveBuy}</p>
     </div>
-    <div className="py-2 flex gap-2">
+    <div className="py-2 flex gap-2 items-center">
+      <p>
+        You pay in token:
+      </p>
       <input type="number"
-        className="px-4 bg-slate-600 rounded-lg"
+        className="px-4 bg-slate-600 rounded-lg py-2"
         value={sellAmount}
         onChange={(e) => setSellAmount(Number(e.target.value))}
       />
       <button onClick={onSellClick}>
         Sell
       </button>
+      <p>You receive: {youReceiveSell}</p>
     </div>
 
   </div>
