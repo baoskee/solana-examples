@@ -13,6 +13,7 @@ reviews-variable-len = "LRxvkSm156Rk7CBss2vrYdBPXDnKXmJzgnjuYYtGZ1L"
 smart-wallet = "BKhDWiNiM9ZEo3Deyf7MmfDMyDYwLeGLagorJ5GtV8XC"
 spl-demo = "2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6"
 token-2022 = "QJqxGatfoyyHgeuxNgur5EWETdXGzYx2hBkdtrbT2gZ"
+virtual-xyk = "AxqJANBzF2LxPQDh33jVSRut8Tsnq5Ag5iDwVg7st9CN"
 
 [registry]
 url = "https://api.apr.dev"
