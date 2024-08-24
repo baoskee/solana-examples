@@ -51,10 +51,12 @@ pub mod virtual_xyk {
         ctx.accounts.curve.set_inner(Curve {
             token_amount: 1_000_000_000_000_000_000, // 1 billion in lamports
             funding_amount: 0,
-            funding_fee_amount: 0,
             virtual_funding_amount,
             token_mint: ctx.accounts.token_mint.key(),
             funding_mint: ctx.accounts.funding_mint.key(),
+
+            funding_fee_amount: 0,
+            fee_authority: ctx.accounts.fee_authority.key(),
             bump: ctx.bumps.curve,
         });
 
@@ -159,7 +161,43 @@ pub mod virtual_xyk {
         Ok(())
     }
 
-    // @wip redeem fees
+    // 1. Check fee authority
+    // 2. Transfer token from funding vault to fee authority
+    // 3. Update curve
+    pub fn redeem_fees(ctx: Context<RedeemFees>) -> Result<()> {
+        require!(
+            ctx.accounts.signer.key() == ctx.accounts.curve.fee_authority, 
+            VirtualXykError::InvalidFeeAuthority
+        );
+
+        // 2. Transfer token from funding vault to fee authority
+        let token_mint_key = ctx.accounts.token_mint.key();
+        let funding_mint_key = ctx.accounts.funding_mint.key();
+        let seeds: &[&[&[u8]]] = &[&[
+            b"funding_vault",
+            token_mint_key.as_ref(),
+            funding_mint_key.as_ref(),
+            &[ctx.bumps.funding_vault],
+        ]];
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.funding_vault.to_account_info(),
+                to: ctx.accounts.signer_funding_ata.to_account_info(),
+                authority: ctx.accounts.funding_vault.to_account_info(),
+                mint: ctx.accounts.funding_mint.to_account_info(),
+            },
+        ).with_signer(seeds);
+        let amount = ctx.accounts.curve.funding_fee_amount;
+        transfer_checked(cpi_ctx, amount, ctx.accounts.funding_mint.decimals)?;
+
+        // 3. Update curve
+        let curve = &mut ctx.accounts.curve;
+        curve.funding_fee_amount = 0;
+
+        Ok(())
+    }
+
     // @wip migrate liquidity to Raydium
 }
 
@@ -167,6 +205,9 @@ pub mod virtual_xyk {
 pub struct Initialize<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+    /// CHECK: Can be system account or any other account
+    pub fee_authority: UncheckedAccount<'info>,
+
     #[account(
         init,
         payer = signer,
@@ -176,7 +217,6 @@ pub struct Initialize<'info> {
         extensions::metadata_pointer::metadata_address = token_mint,
     )]
     pub token_mint: InterfaceAccount<'info, Mint>,
-    #[account()]
     pub funding_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
@@ -216,9 +256,7 @@ pub struct Initialize<'info> {
 pub struct BuyToken<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account()]
     pub token_mint: InterfaceAccount<'info, Mint>,
-    #[account()]
     pub funding_mint: InterfaceAccount<'info, Mint>,
 
     #[account(
@@ -253,7 +291,9 @@ pub struct BuyToken<'info> {
     #[account(
         mut,
         seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
     )]
     pub curve: Account<'info, Curve>,
 
@@ -303,9 +343,46 @@ pub struct SellToken<'info> {
     #[account(
         mut,
         seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
-        bump
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
     )]
     pub curve: Account<'info, Curve>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+}
+
+#[derive(Accounts)]
+pub struct RedeemFees<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    pub funding_mint: InterfaceAccount<'info, Mint>,
+    pub token_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = funding_mint,
+        associated_token::authority = signer,
+    )]
+    pub signer_funding_ata: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"funding_vault", token_mint.key().as_ref(), funding_mint.key().as_ref()],
+        bump,
+        token::mint = funding_mint,
+        token::authority = funding_vault,
+    )]
+    pub funding_vault: InterfaceAccount<'info, TokenAccount>,
+    #[account(
+        mut,
+        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
+    )]
+    pub curve: Account<'info, Curve>,
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
@@ -314,12 +391,14 @@ pub struct SellToken<'info> {
 #[derive(InitSpace)]
 pub struct Curve {
     pub token_amount: u64,
-    pub funding_fee_amount: u64,
     pub funding_amount: u64,
     pub virtual_funding_amount: u64,
 
     pub token_mint: Pubkey,
     pub funding_mint: Pubkey,
+
+    pub funding_fee_amount: u64,
+    pub fee_authority: Pubkey,
     pub bump: u8,
 }
 
@@ -387,4 +466,11 @@ pub fn parse_fee(amount: u64, fee: u64) -> (u64, u64) {
     let fee_amount = amount * fee / 100;
     let amount_out = amount - fee_amount;
     (amount_out, fee_amount)
+}
+
+// MARK: - Errors
+#[error_code]
+pub enum VirtualXykError {
+    #[msg("Invalid fee authority")]
+    InvalidFeeAuthority,
 }
