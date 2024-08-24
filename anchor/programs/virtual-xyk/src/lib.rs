@@ -83,6 +83,12 @@ pub mod virtual_xyk {
         let token_out = ctx.accounts.curve.token_out(funding_in);
 
         // 3. Transfer token from token vault to signer
+        let token_mint_key = ctx.accounts.token_mint.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"vault",
+            token_mint_key.as_ref(),
+            &[ctx.bumps.token_vault],
+        ]];
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
@@ -91,7 +97,7 @@ pub mod virtual_xyk {
                 authority: ctx.accounts.token_vault.to_account_info(),
                 mint: ctx.accounts.token_mint.to_account_info(),
             },
-        );
+        ).with_signer(signer_seeds);
         transfer_checked(cpi_ctx, token_out, ctx.accounts.token_mint.decimals)?;
 
         // 4. Update curve
@@ -125,6 +131,14 @@ pub mod virtual_xyk {
 
         // 3. transfer funding from funding vault to user (sub fees)
         let (funding_out, fee_amount) = parse_fee(funding_out, FEE_PERCENT);
+        let token_mint_key = ctx.accounts.token_mint.key();
+        let funding_mint_key = ctx.accounts.funding_mint.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"funding_vault",
+            token_mint_key.as_ref(),
+            funding_mint_key.as_ref(),
+            &[ctx.bumps.funding_vault],
+        ]];
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
@@ -133,7 +147,7 @@ pub mod virtual_xyk {
                 authority: ctx.accounts.funding_vault.to_account_info(),
                 mint: ctx.accounts.funding_mint.to_account_info(),
             },
-        );
+        ).with_signer(signer_seeds);
         transfer_checked(cpi_ctx, funding_out, ctx.accounts.funding_mint.decimals)?;
 
         // 4. Update curve
