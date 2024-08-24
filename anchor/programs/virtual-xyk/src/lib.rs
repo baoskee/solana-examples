@@ -112,7 +112,7 @@ pub mod virtual_xyk {
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
-                from: ctx.accounts.signer.to_account_info(),
+                from: ctx.accounts.signer_token_ata.to_account_info(),
                 to: ctx.accounts.token_vault.to_account_info(),
                 authority: ctx.accounts.signer.to_account_info(),
                 mint: ctx.accounts.token_mint.to_account_info(),
@@ -121,8 +121,26 @@ pub mod virtual_xyk {
         transfer_checked(cpi_ctx, amount, ctx.accounts.token_mint.decimals)?;
 
         // 2. Calculate funding amount out
+        let funding_out = ctx.accounts.curve.funding_out(amount);
 
         // 3. transfer funding from funding vault to user (sub fees)
+        let (funding_out, fee_amount) = parse_fee(funding_out, FEE_PERCENT);
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.funding_vault.to_account_info(),
+                to: ctx.accounts.signer_funding_ata.to_account_info(),
+                authority: ctx.accounts.funding_vault.to_account_info(),
+                mint: ctx.accounts.funding_mint.to_account_info(),
+            },
+        );
+        transfer_checked(cpi_ctx, funding_out, ctx.accounts.funding_mint.decimals)?;
+
+        // 4. Update curve
+        let curve = &mut ctx.accounts.curve; 
+        curve.funding_amount -= funding_out;
+        curve.funding_fee_amount += fee_amount;
+        curve.token_amount += amount;
 
         Ok(())
     }
