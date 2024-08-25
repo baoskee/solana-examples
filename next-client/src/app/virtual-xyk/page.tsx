@@ -71,7 +71,7 @@ export default function VirtualXykPage() {
       TOKEN_PROGRAM_ID,
     );
 
-    const initializeInst = await p.methods.initialize(
+    const signature = await p.methods.initialize(
       "New launch token",
       "NEW",
       "https://example.com",
@@ -90,17 +90,20 @@ export default function VirtualXykPage() {
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      fundingTokenProgram: TOKEN_PROGRAM_ID
+      fundingTokenProgram: TOKEN_PROGRAM_ID,
     })
-    .instruction()
+    .signers([newMint])
+    .rpc();
 
-    const tx = new Transaction()
-      .add(createTokenVaultInst, createFundingVaultInst, initializeInst);
 
-    tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash()).blockhash;
-    tx.sign(newMint);
-
-    const signature = await p.provider.sendAndConfirm!(tx);
+    // tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash()).blockhash;
+    // tx.sign(newMint);
+    // console.log(tx.signatures);
+    // console.log(tx.signatures[0].publicKey.toBase58());
+    // console.log(newMint.publicKey.toBase58());
+    // console.log(tx.signatures[1].publicKey.toBase58());
+    // console.log(p.provider.publicKey?.toBase58());
+    // const signature = await p.provider.sendAndConfirm!(tx);
     console.log(signature);
     setMint(newMint.publicKey.toBase58());
   }, [])
