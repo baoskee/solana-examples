@@ -236,6 +236,7 @@ pub struct Initialize<'info> {
         bump,
         token::mint = funding_mint,
         token::authority = funding_vault,
+        token::token_program = funding_token_program,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>,
 
@@ -250,6 +251,7 @@ pub struct Initialize<'info> {
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token2022>,
+    pub funding_token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]

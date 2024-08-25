@@ -1,8 +1,8 @@
 "use client";
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { NATIVE_MINT, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -48,9 +48,11 @@ export default function VirtualXykPage() {
       signer: p.provider.publicKey,
       feeAuthority: p.provider.publicKey,
       tokenMint: newMint.publicKey,
-      fundingMint: NATIVE_MINT, // solana native mint
+      fundingMint: NATIVE_MINT, // solana mint
       // @ts-ignore
       tokenProgram: TOKEN_2022_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      fundingTokenProgram: TOKEN_PROGRAM_ID
     })
     .signers([newMint])
     .rpc();
