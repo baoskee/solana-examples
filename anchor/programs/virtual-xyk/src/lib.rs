@@ -229,16 +229,14 @@ pub struct Initialize<'info> {
     pub curve: Account<'info, Curve>,
 
     #[account(
-        init,
-        payer = signer,
+        mut,
         associated_token::mint = token_mint,
         associated_token::authority = curve,
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
 
     #[account(
-        init,
-        payer = signer,
+        mut,
         associated_token::mint = funding_mint,
         associated_token::authority = curve,
         associated_token::token_program = funding_token_program,
@@ -395,7 +393,7 @@ pub struct Curve {
     pub virtual_funding_amount: u64,
 
     pub token_mint: Pubkey, // 32 bytes
-    pub funding_mint: Pubkey,
+    pub funding_mint: Pubkey, // 32 bytes
 
     pub funding_fee_amount: u64,
     pub fee_authority: Pubkey,

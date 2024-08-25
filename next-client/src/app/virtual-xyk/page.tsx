@@ -1,8 +1,8 @@
 "use client";
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, getAssociatedTokenAddressSync, NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -49,6 +49,13 @@ export default function VirtualXykPage() {
       TOKEN_2022_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
     )
+    const createTokenVaultInst = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      tokenVaultAccount,
+      curve,
+      newMint.publicKey,
+      TOKEN_2022_PROGRAM_ID,
+    );
     const fundingVaultAccount = getAssociatedTokenAddressSync(
       NATIVE_MINT,
       curve,
@@ -56,8 +63,15 @@ export default function VirtualXykPage() {
       TOKEN_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
     );
+    const createFundingVaultInst = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      fundingVaultAccount,
+      curve,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID,
+    );
 
-    const signature = await p.methods.initialize(
+    const initializeInst = await p.methods.initialize(
       "New launch token",
       "NEW",
       "https://example.com",
@@ -78,9 +92,15 @@ export default function VirtualXykPage() {
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       fundingTokenProgram: TOKEN_PROGRAM_ID
     })
-    .signers([newMint])
-    .rpc();
+    .instruction()
 
+    const tx = new Transaction()
+      .add(createTokenVaultInst, createFundingVaultInst, initializeInst);
+
+    tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash()).blockhash;
+    tx.sign(newMint);
+
+    const signature = await p.provider.sendAndConfirm!(tx);
     console.log(signature);
     setMint(newMint.publicKey.toBase58());
   }, [])
