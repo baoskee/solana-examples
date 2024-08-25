@@ -7,6 +7,7 @@ export { default as smartWalletIDL } from "./target/idl/smart_wallet.json";
 export { default as cpiSignerIDL } from "./target/idl/cpi_signer.json";
 export { default as splDemoIDL } from "./target/idl/spl_demo.json";
 export { default as token2022IDL } from "./target/idl/token_2022.json";
+export { default as virtualXykIDL } from "./target/idl/virtual_xyk.json";
 
 export * from "./target/types/escrow";
 export * from "./target/types/anchor_counter";
@@ -17,3 +18,4 @@ export * from "./target/types/smart_wallet";
 export * from "./target/types/cpi_signer";
 export * from "./target/types/spl_demo";
 export * from "./target/types/token_2022";
+export * from "./target/types/virtual_xyk";
