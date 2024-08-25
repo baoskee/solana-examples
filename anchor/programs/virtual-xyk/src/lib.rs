@@ -222,37 +222,36 @@ pub struct Initialize<'info> {
     #[account(
         init,
         payer = signer,
-        seeds = [b"vault", token_mint.key().as_ref()],
-        bump,
-        token::mint = token_mint,
-        token::authority = token_vault,
-    )]
-    pub token_vault: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        init,
-        payer = signer,
-        seeds = [b"funding_vault", token_mint.key().as_ref(), funding_mint.key().as_ref()],
-        bump,
-        token::mint = funding_mint,
-        token::authority = funding_vault,
-        token::token_program = funding_token_program,
-    )]
-    pub funding_vault: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        init,
-        payer = signer,
         space = 8 + Curve::INIT_SPACE,
         seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
         bump
     )]
     pub curve: Account<'info, Curve>,
 
+    #[account(
+        init,
+        payer = signer,
+        associated_token::mint = token_mint,
+        associated_token::authority = curve,
+    )]
+    pub token_vault: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = signer,
+        associated_token::mint = funding_mint,
+        associated_token::authority = curve,
+        associated_token::token_program = funding_token_program,
+    )]
+    pub funding_vault: InterfaceAccount<'info, TokenAccount>,
+
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token2022>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub funding_token_program: Program<'info, Token>,
 }
+
+// MARK: - @todo change token vault and funding vault to appropriate ATAs
 
 #[derive(Accounts)]
 pub struct BuyToken<'info> {
@@ -390,18 +389,21 @@ pub struct RedeemFees<'info> {
 }
 
 #[account]
-#[derive(InitSpace)]
 pub struct Curve {
-    pub token_amount: u64,
-    pub funding_amount: u64,
+    pub token_amount: u64, // 8 bytes
+    pub funding_amount: u64, // 8 bytes
     pub virtual_funding_amount: u64,
 
-    pub token_mint: Pubkey,
+    pub token_mint: Pubkey, // 32 bytes
     pub funding_mint: Pubkey,
 
     pub funding_fee_amount: u64,
     pub fee_authority: Pubkey,
     pub bump: u8,
+}
+
+impl Curve {
+    pub const INIT_SPACE: usize = 8 + 8 + 8 + 32 + 32 + 8 + 32 + 1;
 }
 
 impl Curve {

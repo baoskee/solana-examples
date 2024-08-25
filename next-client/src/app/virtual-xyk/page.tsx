@@ -1,8 +1,8 @@
 "use client";
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Keypair, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, getAssociatedTokenAddressSync, NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -37,6 +37,26 @@ export default function VirtualXykPage() {
     if (!p.provider.publicKey) return;
 
     const newMint = new Keypair();
+    const [curve] = PublicKey.findProgramAddressSync(
+      [Buffer.from("curve"), newMint.publicKey.toBuffer()],
+      p.programId
+    )
+
+    const tokenVaultAccount = getAssociatedTokenAddressSync(
+      newMint.publicKey,
+      curve,
+      true,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    )
+    const fundingVaultAccount = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      curve,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
     const signature = await p.methods.initialize(
       "New launch token",
       "NEW",
@@ -49,9 +69,13 @@ export default function VirtualXykPage() {
       feeAuthority: p.provider.publicKey,
       tokenMint: newMint.publicKey,
       fundingMint: NATIVE_MINT, // solana mint
+
       // @ts-ignore
+      tokenVault: tokenVaultAccount,
+      fundingVault: fundingVaultAccount,
       tokenProgram: TOKEN_2022_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       fundingTokenProgram: TOKEN_PROGRAM_ID
     })
     .signers([newMint])
