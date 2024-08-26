@@ -44,6 +44,27 @@ export default function VirtualXykPage() {
     enabled: !!mint,
   })
 
+  const walletTokenBalance = useQuery({
+    queryKey: ["walletTokenBalance"],
+    queryFn: async () => {
+      const p = await program();
+      if (!p.provider.publicKey) return;
+
+      const signerTokenAta = getAssociatedTokenAddressSync(
+        new PublicKey(mint),
+        p.provider.publicKey,
+        true,
+        TOKEN_2022_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
+      );
+
+      const account = await p.provider.connection.getTokenAccountBalance(signerTokenAta);
+      if (!account) return;
+
+      return account.value.uiAmount;
+    }
+  });
+
   const initializeCurve = useCallback(async () => {
     const p = await program();
     if (!p.provider.publicKey) return;
@@ -203,7 +224,8 @@ export default function VirtualXykPage() {
     console.log(signature);
 
     contractState.refetch();
-  }, [mint, buyAmount, contractState])
+    walletTokenBalance.refetch();
+  }, [mint, buyAmount, contractState, walletTokenBalance])
 
   const [sellAmount, setSellAmount] = useState(0);
   const onSellClick = useCallback(async () => {
@@ -216,6 +238,9 @@ export default function VirtualXykPage() {
     <h1>VirtualXykPage</h1>
     <p>
       Current Mint for new token: {mint}
+    </p>
+    <p>
+      Wallet token balance: {walletTokenBalance.data}
     </p>
     <pre className="text-xs">{JSON.stringify(contractState.data, null, 2)}</pre>
     <button onClick={initializeCurve}>
