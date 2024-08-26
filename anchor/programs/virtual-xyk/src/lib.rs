@@ -363,6 +363,7 @@ pub struct RedeemFees<'info> {
         mut,
         associated_token::mint = funding_mint,
         associated_token::authority = signer,
+        associated_token::token_program = funding_token_program,
     )]
     pub signer_funding_ata: InterfaceAccount<'info, TokenAccount>,
 
@@ -370,9 +371,11 @@ pub struct RedeemFees<'info> {
         mut,
         associated_token::mint = funding_mint,
         associated_token::authority = curve,
+        associated_token::token_program = funding_token_program,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>,
 
+    // Program accounts
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub funding_token_program: Program<'info, Token>
 }

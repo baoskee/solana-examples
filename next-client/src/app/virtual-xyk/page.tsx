@@ -235,34 +235,6 @@ export default function VirtualXykPage() {
       [Buffer.from("curve"), new PublicKey(mint).toBuffer()],
       p.programId
     ); 
-    const signerFundingAta = getAssociatedTokenAddressSync(
-      NATIVE_MINT,
-      p.provider.publicKey,
-      true,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-    const signerTokenAta = getAssociatedTokenAddressSync(
-      new PublicKey(mint),
-      p.provider.publicKey,
-      true,
-      TOKEN_2022_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-    const fundingVault = getAssociatedTokenAddressSync(
-      NATIVE_MINT,
-      curve,
-      true,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-    const tokenVault = getAssociatedTokenAddressSync(
-      new PublicKey(mint),
-      curve,
-      true,
-      TOKEN_2022_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
 
     const signature = await p.methods.sellToken(
       new BN(sellAmount * LAMPORTS_PER_SOL)
@@ -283,6 +255,26 @@ export default function VirtualXykPage() {
     contractState.refetch();
     walletTokenBalance.refetch();
   }, [mint, sellAmount, walletTokenBalance, contractState])
+
+  const redeemFees = useCallback(async () => {
+    const p = await program();
+    if (!p.provider.publicKey) return;
+
+    const signature = await p.methods.redeemFees()
+      .accounts({
+        signer: p.provider.publicKey,
+        fundingMint: NATIVE_MINT,
+        tokenMint: new PublicKey(mint),
+        // @ts-ignore
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        fundingTokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+    console.log(signature);
+
+    contractState.refetch();
+    walletTokenBalance.refetch();
+  }, [contractState, walletTokenBalance, mint])
 
 
   return <div className="flex flex-col gap-4">
@@ -324,6 +316,9 @@ export default function VirtualXykPage() {
         Sell
       </button>
     </div>
+    <button onClick={redeemFees}>
+      Redeem fees
+    </button>
   </div>;
 }
 
