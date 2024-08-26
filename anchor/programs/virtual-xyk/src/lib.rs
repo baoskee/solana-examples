@@ -70,7 +70,7 @@ pub mod virtual_xyk {
     pub fn buy_token(ctx: Context<BuyToken>, amount: u64) -> Result<()> {
         // 1. Transfer token from signer to funding vault
         let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.funding_token_program.to_account_info(),
             TransferChecked {
                 from: ctx.accounts.signer_funding_ata.to_account_info(),
                 to: ctx.accounts.funding_vault.to_account_info(),
@@ -87,16 +87,16 @@ pub mod virtual_xyk {
         // 3. Transfer token from token vault to signer
         let token_mint_key = ctx.accounts.token_mint.key();
         let signer_seeds: &[&[&[u8]]] = &[&[
-            b"vault",
+            b"curve",
             token_mint_key.as_ref(),
-            &[ctx.bumps.token_vault],
+            &[ctx.bumps.curve],
         ]];
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
                 from: ctx.accounts.token_vault.to_account_info(),
                 to: ctx.accounts.signer_token_ata.to_account_info(),
-                authority: ctx.accounts.token_vault.to_account_info(),
+                authority: ctx.accounts.curve.to_account_info(),
                 mint: ctx.accounts.token_mint.to_account_info(),
             },
         ).with_signer(signer_seeds);
@@ -134,19 +134,17 @@ pub mod virtual_xyk {
         // 3. transfer funding from funding vault to user (sub fees)
         let (funding_out, fee_amount) = parse_fee(funding_out, FEE_PERCENT);
         let token_mint_key = ctx.accounts.token_mint.key();
-        let funding_mint_key = ctx.accounts.funding_mint.key();
         let signer_seeds: &[&[&[u8]]] = &[&[
-            b"funding_vault",
+            b"curve",
             token_mint_key.as_ref(),
-            funding_mint_key.as_ref(),
-            &[ctx.bumps.funding_vault],
+            &[ctx.bumps.curve],
         ]];
         let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.funding_token_program.to_account_info(),
             TransferChecked {
                 from: ctx.accounts.funding_vault.to_account_info(),
                 to: ctx.accounts.signer_funding_ata.to_account_info(),
-                authority: ctx.accounts.funding_vault.to_account_info(),
+                authority: ctx.accounts.curve.to_account_info(),
                 mint: ctx.accounts.funding_mint.to_account_info(),
             },
         ).with_signer(signer_seeds);
@@ -172,19 +170,17 @@ pub mod virtual_xyk {
 
         // 2. Transfer token from funding vault to fee authority
         let token_mint_key = ctx.accounts.token_mint.key();
-        let funding_mint_key = ctx.accounts.funding_mint.key();
         let seeds: &[&[&[u8]]] = &[&[
-            b"funding_vault",
+            b"curve",
             token_mint_key.as_ref(),
-            funding_mint_key.as_ref(),
-            &[ctx.bumps.funding_vault],
+            &[ctx.bumps.curve],
         ]];
         let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
+            ctx.accounts.funding_token_program.to_account_info(),
             TransferChecked {
                 from: ctx.accounts.funding_vault.to_account_info(),
                 to: ctx.accounts.signer_funding_ata.to_account_info(),
-                authority: ctx.accounts.funding_vault.to_account_info(),
+                authority: ctx.accounts.curve.to_account_info(),
                 mint: ctx.accounts.funding_mint.to_account_info(),
             },
         ).with_signer(seeds);
@@ -251,6 +247,14 @@ pub struct BuyToken<'info> {
     pub signer: Signer<'info>,
     pub token_mint: InterfaceAccount<'info, Mint>,
     pub funding_mint: InterfaceAccount<'info, Mint>,
+    #[account(
+        mut,
+        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
+    )]
+    pub curve: Account<'info, Curve>,
 
     #[account(
         mut,
@@ -267,42 +271,36 @@ pub struct BuyToken<'info> {
 
     #[account(
         mut,
-        seeds = [b"vault", token_mint.key().as_ref()],
-        bump,
-        token::mint = token_mint,
-        token::authority = token_vault,
+        associated_token::mint = token_mint,
+        associated_token::authority = curve,
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [b"funding_vault", token_mint.key().as_ref(), funding_mint.key().as_ref()],
-        bump,
-        token::mint = funding_mint,
-        token::authority = funding_vault,
+        associated_token::mint = funding_mint,
+        associated_token::authority = curve,
     )]
-    pub funding_vault: InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        mut,
-        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
-        bump,
-        constraint = curve.funding_mint == funding_mint.key(),
-        constraint = curve.token_mint == token_mint.key(),
-    )]
-    pub curve: Account<'info, Curve>,
-
-    pub token_program: Program<'info, Token>,
+    pub funding_vault: InterfaceAccount<'info, TokenAccount>, 
     pub associated_token_program: Program<'info, AssociatedToken>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub funding_token_program: Program<'info, Token>
 }
 
 #[derive(Accounts)]
 pub struct SellToken<'info> {
     #[account(mut)]
     pub signer: Signer<'info>, 
-    #[account()]
     pub token_mint: InterfaceAccount<'info, Mint>,
-    #[account()]
     pub funding_mint: InterfaceAccount<'info, Mint>,
-    
+    #[account(
+        mut,
+        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
+    )]
+    pub curve: Account<'info, Curve>,
     #[account(
         mut,
         associated_token::mint = token_mint,
@@ -315,34 +313,22 @@ pub struct SellToken<'info> {
         associated_token::authority = signer,
     )]
     pub signer_funding_ata: InterfaceAccount<'info, TokenAccount>,
-
     #[account(
         mut,
-        seeds = [b"vault", token_mint.key().as_ref()],
-        bump,
-        token::mint = token_mint,
-        token::authority = token_vault,
+        associated_token::mint = token_mint,
+        associated_token::authority = token_vault,
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [b"funding_vault", token_mint.key().as_ref(), funding_mint.key().as_ref()],
-        bump,
-        token::mint = funding_mint,
-        token::authority = funding_vault,
+        associated_token::mint = funding_mint,
+        associated_token::authority = funding_vault,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>,
-
-    #[account(
-        mut,
-        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
-        bump,
-        constraint = curve.funding_mint == funding_mint.key(),
-        constraint = curve.token_mint == token_mint.key(),
-    )]
-    pub curve: Account<'info, Curve>,
-    pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+
+    pub token_program: Program<'info, Token2022>,
+    pub funding_token_program: Program<'info, Token>
 }
 
 #[derive(Accounts)]
@@ -352,6 +338,15 @@ pub struct RedeemFees<'info> {
     pub funding_mint: InterfaceAccount<'info, Mint>,
     pub token_mint: InterfaceAccount<'info, Mint>,
 
+   #[account(
+        mut,
+        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
+        bump,
+        constraint = curve.funding_mint == funding_mint.key(),
+        constraint = curve.token_mint == token_mint.key(),
+    )]
+    pub curve: Account<'info, Curve>,
+
     #[account(
         mut,
         associated_token::mint = funding_mint,
@@ -361,23 +356,13 @@ pub struct RedeemFees<'info> {
 
     #[account(
         mut,
-        seeds = [b"funding_vault", token_mint.key().as_ref(), funding_mint.key().as_ref()],
-        bump,
-        token::mint = funding_mint,
-        token::authority = funding_vault,
+        associated_token::mint = funding_mint,
+        associated_token::authority = curve,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>,
-    #[account(
-        mut,
-        seeds = [b"curve".as_ref(), token_mint.key().as_ref()],
-        bump,
-        constraint = curve.funding_mint == funding_mint.key(),
-        constraint = curve.token_mint == token_mint.key(),
-    )]
-    pub curve: Account<'info, Curve>,
 
-    pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
+    pub funding_token_program: Program<'info, Token>
 }
 
 #[account]
