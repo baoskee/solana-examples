@@ -396,11 +396,11 @@ impl Curve {
     }
 
     pub fn funding_out(&self, token_in: u64) -> u64 {
-        let numerator = self.token_amount * (self.virtual_funding_amount + self.funding_amount);
-        let denominator = self.token_amount + token_in;
+        let numerator: u128 = self.token_amount as u128 * (self.virtual_funding_amount + self.funding_amount) as u128;
+        let denominator: u128 = (self.token_amount + token_in) as u128;
         let funding_out =
-            self.virtual_funding_amount + self.funding_amount - (numerator / denominator);
-        funding_out
+            (self.virtual_funding_amount + self.funding_amount) as u128 - (numerator / denominator);
+        funding_out as u64
     }
 }
 
