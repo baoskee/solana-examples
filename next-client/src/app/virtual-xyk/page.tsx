@@ -1,14 +1,14 @@
 "use client";
 import { anchorProvider } from "@/lib/util";
 import { BN, Program } from "@coral-xyz/anchor";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, NATIVE_MINT_2022, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
 import { useCallback, useState } from "react";
 
 
-const DEFAULT_MINT = "9ghqnUr3woUSpCihs63vVNQmBTyeNGro1FqVsAhDvXfE";
+const DEFAULT_MINT = "9V8jAEuE39E53omBeJe2LYZiGVmDKvZnJSoR8xPA4NHj";
 
 export default function VirtualXykPage() {
 
@@ -89,6 +89,129 @@ export default function VirtualXykPage() {
     contractState.refetch();
   }, [contractState])
 
+  const [buyAmount, setBuyAmount] = useState(0); 
+  const onBuyClick = useCallback(async () => {
+    const p = await program();
+    if (!p.provider.publicKey) return;
+
+    const [curve] = PublicKey.findProgramAddressSync(
+      [Buffer.from("curve"), new PublicKey(mint).toBuffer()],
+      p.programId
+    ); 
+    const signerFundingAta = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      p.provider.publicKey,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const createSignerFundingAta = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      signerFundingAta,
+      p.provider.publicKey,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const signerTokenAta = getAssociatedTokenAddressSync(
+      new PublicKey(mint),
+      p.provider.publicKey,
+      true,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const createSignerTokenAta = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      signerTokenAta,
+      p.provider.publicKey,
+      new PublicKey(mint),
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const fundingVault = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      curve,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const createFundingVault = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      fundingVault,
+      curve,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const tokenVault = getAssociatedTokenAddressSync(
+      new PublicKey(mint),
+      curve,
+      true,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const wrappedSolAta = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      p.provider.publicKey,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const createWrappedSolAta = createAssociatedTokenAccountIdempotentInstruction(
+      p.provider.publicKey,
+      wrappedSolAta,
+      p.provider.publicKey,
+      NATIVE_MINT,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const buyInst = await p.methods.buyToken(
+      new BN(buyAmount * LAMPORTS_PER_SOL)
+    ).accounts({
+      signer: p.provider.publicKey,
+      tokenMint: new PublicKey(mint),
+      fundingMint: NATIVE_MINT,
+      // @ts-ignore
+      curve,
+      signerTokenAta,
+      signerFundingAta,
+      tokenVault,
+      fundingVault,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      fundingTokenProgram: TOKEN_PROGRAM_ID,
+    }).instruction();
+
+    const tx = new Transaction().add(
+      createSignerFundingAta,
+      createSignerTokenAta,
+      createFundingVault,
+      createWrappedSolAta,
+      SystemProgram.transfer({
+        fromPubkey: p.provider.publicKey,
+        toPubkey: wrappedSolAta,
+        lamports: buyAmount * LAMPORTS_PER_SOL,
+      }),
+      createSyncNativeInstruction(wrappedSolAta),
+      buyInst
+    );
+
+    const signature = await p.provider.sendAndConfirm!(tx);
+    console.log(signature);
+
+    contractState.refetch();
+  }, [mint, buyAmount, contractState])
+
+  const [sellAmount, setSellAmount] = useState(0);
+  const onSellClick = useCallback(async () => {
+    const p = await program();
+    if (!p.provider.publicKey) return;
+  }, [])
+
+
   return <div className="flex flex-col gap-4">
     <h1>VirtualXykPage</h1>
     <p>
@@ -99,6 +222,33 @@ export default function VirtualXykPage() {
       Launch token
     </button>
 
+
+    <div className="flex gap-2 items-center">
+      <p>
+        You pay in SOL:
+      </p>
+      <input type="number"
+        className="px-4 bg-slate-600 rounded-lg py-2"
+        value={buyAmount}
+        onChange={(e) => setBuyAmount(Number(e.target.value))}
+      />
+      <button onClick={onBuyClick}>
+        Buy
+      </button>
+    </div>
+    <div className="flex gap-2 items-center">
+      <p>
+        You pay in token:
+      </p>
+      <input type="number"
+        className="px-4 bg-slate-600 rounded-lg py-2"
+        value={sellAmount}
+        onChange={(e) => setSellAmount(Number(e.target.value))}
+      />
+      <button onClick={onSellClick}>
+        Sell
+      </button>
+    </div>
   </div>;
 }
 

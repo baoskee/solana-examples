@@ -260,12 +260,15 @@ pub struct BuyToken<'info> {
         mut,
         associated_token::mint = token_mint,
         associated_token::authority = signer,
+        associated_token::token_program = token_program,
     )]
     pub signer_token_ata: InterfaceAccount<'info, TokenAccount>,
+
     #[account(
         mut,
         associated_token::mint = funding_mint,
         associated_token::authority = signer,
+        associated_token::token_program = funding_token_program,
     )]
     pub signer_funding_ata: InterfaceAccount<'info, TokenAccount>,
 
@@ -273,12 +276,14 @@ pub struct BuyToken<'info> {
         mut,
         associated_token::mint = token_mint,
         associated_token::authority = curve,
+        associated_token::token_program = token_program,
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = funding_mint,
         associated_token::authority = curve,
+        associated_token::token_program = funding_token_program,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>, 
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -385,9 +390,9 @@ impl Curve {
 
 impl Curve {
     pub fn token_out(&self, funding_in: u64) -> u64 {
-        let k = (self.virtual_funding_amount + self.funding_amount) * self.token_amount;
-        let denominator = self.virtual_funding_amount + self.funding_amount + funding_in;
-        self.token_amount - (k / denominator)
+        let k: u128 = (self.virtual_funding_amount + self.funding_amount) as u128 * self.token_amount as u128;
+        let denominator: u128 = (self.virtual_funding_amount + self.funding_amount + funding_in) as u128;
+        (self.token_amount as u128 - (k / denominator)) as u64
     }
 
     pub fn funding_out(&self, token_in: u64) -> u64 {
