@@ -231,7 +231,58 @@ export default function VirtualXykPage() {
   const onSellClick = useCallback(async () => {
     const p = await program();
     if (!p.provider.publicKey) return;
-  }, [])
+    const [curve] = PublicKey.findProgramAddressSync(
+      [Buffer.from("curve"), new PublicKey(mint).toBuffer()],
+      p.programId
+    ); 
+    const signerFundingAta = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      p.provider.publicKey,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const signerTokenAta = getAssociatedTokenAddressSync(
+      new PublicKey(mint),
+      p.provider.publicKey,
+      true,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const fundingVault = getAssociatedTokenAddressSync(
+      NATIVE_MINT,
+      curve,
+      true,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+    const tokenVault = getAssociatedTokenAddressSync(
+      new PublicKey(mint),
+      curve,
+      true,
+      TOKEN_2022_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    );
+
+    const signature = await p.methods.sellToken(
+      new BN(sellAmount * LAMPORTS_PER_SOL)
+    ).accounts({
+      signer: p.provider.publicKey,
+      tokenMint: new PublicKey(mint),
+      fundingMint: NATIVE_MINT,
+
+      // @ts-ignore
+      curve,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      tokenProgram: TOKEN_2022_PROGRAM_ID,
+      fundingTokenProgram: TOKEN_PROGRAM_ID,
+    }).rpc();
+
+    console.log(signature);
+
+    contractState.refetch();
+    walletTokenBalance.refetch();
+  }, [mint, sellAmount, walletTokenBalance, contractState])
 
 
   return <div className="flex flex-col gap-4">
@@ -245,8 +296,7 @@ export default function VirtualXykPage() {
     <pre className="text-xs">{JSON.stringify(contractState.data, null, 2)}</pre>
     <button onClick={initializeCurve}>
       Launch token
-    </button>
-
+    </button> 
 
     <div className="flex gap-2 items-center">
       <p>

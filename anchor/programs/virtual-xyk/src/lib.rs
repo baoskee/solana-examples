@@ -239,7 +239,7 @@ pub struct Initialize<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-// MARK: - @todo change token vault and funding vault to appropriate ATAs
+// MARK: - Buy Context
 
 #[derive(Accounts)]
 pub struct BuyToken<'info> {
@@ -292,6 +292,8 @@ pub struct BuyToken<'info> {
     pub funding_token_program: Program<'info, Token>
 }
 
+// MARK: - Sell Context
+
 #[derive(Accounts)]
 pub struct SellToken<'info> {
     #[account(mut)]
@@ -310,28 +312,33 @@ pub struct SellToken<'info> {
         mut,
         associated_token::mint = token_mint,
         associated_token::authority = signer,
+        associated_token::token_program = token_program,
     )]
     pub signer_token_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = funding_mint,
         associated_token::authority = signer,
+        associated_token::token_program = funding_token_program,
     )]
     pub signer_funding_ata: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = token_mint,
-        associated_token::authority = token_vault,
+        associated_token::authority = curve,
+        associated_token::token_program = token_program,
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
     #[account(
         mut,
         associated_token::mint = funding_mint,
-        associated_token::authority = funding_vault,
+        associated_token::authority = curve,
+        associated_token::token_program = funding_token_program,
     )]
     pub funding_vault: InterfaceAccount<'info, TokenAccount>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
 
+    // Program accounts
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub token_program: Program<'info, Token2022>,
     pub funding_token_program: Program<'info, Token>
 }
