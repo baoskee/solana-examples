@@ -5,7 +5,7 @@ import { ASSOCIATED_TOKEN_PROGRAM_ID, createAssociatedTokenAccountIdempotent, cr
 import { Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 
 const DEFAULT_MINT = "9V8jAEuE39E53omBeJe2LYZiGVmDKvZnJSoR8xPA4NHj";
@@ -25,17 +25,7 @@ export default function VirtualXykPage() {
           p.programId
         );
         const curve = await p.account.curve.fetch(curveAddress);
-
-        return {
-          tokenAmount: formatLamports(curve.tokenAmount),
-          fundingAmount: formatLamports(curve.fundingAmount),
-          virtualFundingAmount: formatLamports(curve.virtualFundingAmount),
-          tokenMint: curve.tokenMint.toBase58(),
-          fundingMint: curve.fundingMint.toBase58(),
-          fundingFeeAmount: formatLamports(curve.fundingFeeAmount),
-          feeAuthority: curve.feeAuthority.toBase58(),
-          bump: curve.bump
-        };
+        return curve; 
       } catch (e) {
         console.error(e);
         return null;
@@ -43,6 +33,20 @@ export default function VirtualXykPage() {
     },
     enabled: !!mint,
   })
+
+  const contractStateFormatted = useMemo(() => {
+    if (!contractState.data) return;
+    return {
+      tokenAmount: formatLamports(contractState.data.tokenAmount),
+      fundingAmount: formatLamports(contractState.data.fundingAmount),
+      virtualFundingAmount: formatLamports(contractState.data.virtualFundingAmount),
+      tokenMint: contractState.data.tokenMint.toBase58(),
+      fundingMint: contractState.data.fundingMint.toBase58(),
+      fundingFeeAmount: formatLamports(contractState.data.fundingFeeAmount),
+      feeAuthority: contractState.data.feeAuthority.toBase58(),
+      bump: contractState.data.bump
+    };
+  }, [contractState.data])
 
   const walletTokenBalance = useQuery({
     queryKey: ["walletTokenBalance"],
@@ -276,7 +280,6 @@ export default function VirtualXykPage() {
     walletTokenBalance.refetch();
   }, [contractState, walletTokenBalance, mint])
 
-
   return <div className="flex flex-col gap-4">
     <h1>VirtualXykPage</h1>
     <p>
@@ -285,7 +288,7 @@ export default function VirtualXykPage() {
     <p>
       Wallet token balance: {walletTokenBalance.data}
     </p>
-    <pre className="text-xs">{JSON.stringify(contractState.data, null, 2)}</pre>
+    <pre className="text-xs">{JSON.stringify(contractStateFormatted, null, 2)}</pre>
     <button onClick={initializeCurve}>
       Launch token
     </button> 
