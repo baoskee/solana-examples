@@ -7,27 +7,39 @@ import { useQuery } from "@tanstack/react-query";
 import { VirtualXyk, virtualXykIDL } from "anchor-local";
 import { useCallback, useState } from "react";
 
+
+const DEFAULT_MINT = "9ghqnUr3woUSpCihs63vVNQmBTyeNGro1FqVsAhDvXfE";
+
 export default function VirtualXykPage() {
 
-  const [mint, setMint] = useState<string>();
+  const [mint, setMint] = useState<string>(DEFAULT_MINT);
   const contractState = useQuery({
-    queryKey: ["contractState", mint],
+    queryKey: ["contractState"],
     queryFn: async () => {
-      if (!mint) return;
+      try {
+        if (!mint) return;
 
-      const p = await program();
-      const curve = await p.account.curve.fetch(mint);
+        const p = await program();
+        const [curveAddress] = PublicKey.findProgramAddressSync(
+          [Buffer.from("curve"), new PublicKey(mint).toBuffer()],
+          p.programId
+        );
+        const curve = await p.account.curve.fetch(curveAddress);
 
-      return {
-        tokenAmount: (curve.tokenAmount.toNumber() / LAMPORTS_PER_SOL).toString(),
-        fundingAmount: (curve.fundingAmount.toNumber() / LAMPORTS_PER_SOL).toString(),
-        virtualFundingAmount: (curve.virtualFundingAmount.toNumber() / LAMPORTS_PER_SOL).toString(),
-        tokenMint: curve.tokenMint.toBase58(),
-        fundingMint: curve.fundingMint.toBase58(),
-        fundingFeeAmount: (curve.fundingFeeAmount.toNumber() / LAMPORTS_PER_SOL).toString(),
-        feeAuthority: curve.feeAuthority.toBase58(),
-        bump: curve.bump
-      };
+        return {
+          tokenAmount: formatLamports(curve.tokenAmount),
+          fundingAmount: formatLamports(curve.fundingAmount),
+          virtualFundingAmount: formatLamports(curve.virtualFundingAmount),
+          tokenMint: curve.tokenMint.toBase58(),
+          fundingMint: curve.fundingMint.toBase58(),
+          fundingFeeAmount: formatLamports(curve.fundingFeeAmount),
+          feeAuthority: curve.feeAuthority.toBase58(),
+          bump: curve.bump
+        };
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
     },
     enabled: !!mint,
   })
@@ -48,29 +60,7 @@ export default function VirtualXykPage() {
       true,
       TOKEN_2022_PROGRAM_ID,
       ASSOCIATED_TOKEN_PROGRAM_ID
-    )
-    const createTokenVaultInst = createAssociatedTokenAccountIdempotentInstruction(
-      p.provider.publicKey,
-      tokenVaultAccount,
-      curve,
-      newMint.publicKey,
-      TOKEN_2022_PROGRAM_ID,
     );
-    const fundingVaultAccount = getAssociatedTokenAddressSync(
-      NATIVE_MINT,
-      curve,
-      true,
-      TOKEN_PROGRAM_ID,
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-    const createFundingVaultInst = createAssociatedTokenAccountIdempotentInstruction(
-      p.provider.publicKey,
-      fundingVaultAccount,
-      curve,
-      NATIVE_MINT,
-      TOKEN_PROGRAM_ID,
-    );
-
     const signature = await p.methods.initialize(
       "New launch token",
       "NEW",
@@ -78,40 +68,34 @@ export default function VirtualXykPage() {
       // set it at 50 SOL
       new BN(50 * LAMPORTS_PER_SOL)
     )
-    .accounts({
-      signer: p.provider.publicKey,
-      feeAuthority: p.provider.publicKey,
-      tokenMint: newMint.publicKey,
-      fundingMint: NATIVE_MINT, // solana mint
+      .accounts({
+        signer: p.provider.publicKey,
+        feeAuthority: p.provider.publicKey,
+        tokenMint: newMint.publicKey,
+        fundingMint: NATIVE_MINT, // solana mint
 
-      // @ts-ignore
-      tokenVault: tokenVaultAccount,
-      fundingVault: fundingVaultAccount,
-      tokenProgram: TOKEN_2022_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-      fundingTokenProgram: TOKEN_PROGRAM_ID,
-    })
-    .signers([newMint])
-    .rpc();
+        // @ts-ignore
+        tokenVault: tokenVaultAccount,
+        tokenProgram: TOKEN_2022_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      })
+      .signers([newMint])
+      .rpc();
 
-
-    // tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash()).blockhash;
-    // tx.sign(newMint);
-    // console.log(tx.signatures);
-    // console.log(tx.signatures[0].publicKey.toBase58());
-    // console.log(newMint.publicKey.toBase58());
-    // console.log(tx.signatures[1].publicKey.toBase58());
-    // console.log(p.provider.publicKey?.toBase58());
-    // const signature = await p.provider.sendAndConfirm!(tx);
     console.log(signature);
     setMint(newMint.publicKey.toBase58());
-  }, [])
 
-  return <div>
+    contractState.refetch();
+  }, [contractState])
+
+  return <div className="flex flex-col gap-4">
     <h1>VirtualXykPage</h1>
+    <p>
+      Current Mint for new token: {mint}
+    </p>
     <pre className="text-xs">{JSON.stringify(contractState.data, null, 2)}</pre>
-    <button onClick={initializeCurve}> 
+    <button onClick={initializeCurve}>
       Launch token
     </button>
 
@@ -122,9 +106,18 @@ const program = async () => {
   const provider = await anchorProvider();
   const program = new Program<VirtualXyk>(
     // @ts-ignore
-    virtualXykIDL, 
+    virtualXykIDL,
     provider
   );
 
   return program;
+}
+
+function formatLamports(lamports: BN): string {
+  const lamportsString = lamports.toString();
+  const decimalIndex = lamportsString.length - 9;
+  if (decimalIndex <= 0) {
+    return "0." + lamportsString.padStart(9, "0");
+  }
+  return lamportsString.slice(0, decimalIndex) + "." + lamportsString.slice(decimalIndex);
 }

@@ -236,18 +236,11 @@ pub struct Initialize<'info> {
     )]
     pub token_vault: InterfaceAccount<'info, TokenAccount>,
 
-    // #[account(
-    //     mut,
-    //     associated_token::mint = funding_mint,
-    //     associated_token::authority = curve,
-    //     associated_token::token_program = funding_token_program,
-    // )]
-    // pub funding_vault: InterfaceAccount<'info, TokenAccount>,
+    // do not initialize funding vault here to save Stack space
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token2022>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub funding_token_program: Program<'info, Token>,
 }
 
 // MARK: - @todo change token vault and funding vault to appropriate ATAs
