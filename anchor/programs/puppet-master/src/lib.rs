@@ -1,4 +1,7 @@
 use anchor_lang::prelude::*;
+use puppet::cpi::accounts::SetData;
+use puppet::program::Puppet;
+use puppet::{self, Data};
 
 declare_id!("F4YurBauRjWpHpynNZhARWezDoDc2wLCWTjoihe338Ck");
 
@@ -6,11 +9,19 @@ declare_id!("F4YurBauRjWpHpynNZhARWezDoDc2wLCWTjoihe338Ck");
 pub mod puppet_master {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
+    pub fn pull_strings(ctx: Context<PullStrings>, data: u64) -> Result<()> {
+        let cpi_program = ctx.accounts.puppet_program.to_account_info();
+        let cpi_accounts = SetData {
+            puppet: ctx.accounts.puppet.to_account_info(),
+        };
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        puppet::cpi::set_data(cpi_ctx, data)
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
+pub struct PullStrings<'info> {
+    #[account(mut)]
+    pub puppet: Account<'info, Data>,
+    pub puppet_program: Program<'info, Puppet>,
+}

@@ -10,7 +10,30 @@ pub mod puppet {
         msg!("Greetings from: {:?}", ctx.program_id);
         Ok(())
     }
+
+    pub fn set_data(ctx: Context<SetData>, data: u64) -> Result<()> {
+        let puppet = &mut ctx.accounts.puppet;
+        puppet.data = data;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
+pub struct Initialize<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(init, payer = signer, space = 8 + 8)]
+    pub puppet: Account<'info, Data>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetData<'info> {
+    #[account(mut)]
+    pub puppet: Account<'info, Data>,
+}
+
+#[account]
+pub struct Data {
+    pub data: u64,
+}
