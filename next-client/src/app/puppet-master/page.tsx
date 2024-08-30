@@ -2,7 +2,7 @@
 
 import { anchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -26,12 +26,12 @@ export default function PuppetMasterPage() {
     const sig = await p.methods.initialize().accounts({
       puppet: puppet.publicKey
     })
-    .signers([puppet])
-    .rpc();
- 
+      .signers([puppet])
+      .rpc();
+
     console.log(sig);
 
-   setPuppet(puppet);
+    setPuppet(puppet);
     puppetData.refetch();
   }, [puppetData])
 
@@ -39,17 +39,34 @@ export default function PuppetMasterPage() {
     if (!puppet) return;
     const p = await puppetMasterProgram();
     const _puppetProgram = await puppetProgram();
-    const sig = await p.methods.pullStrings(
+    const inst = await p.methods.pullStrings(
       new BN(10)
     )
-    .accounts({
-      puppet: puppet.publicKey,
-      // @ts-ignore
-      puppetProgram: _puppetProgram.programId
-    })
-    .rpc();
+      .accounts({
+        puppet: puppet.publicKey,
+        // @ts-ignore
+        puppetProgram: _puppetProgram.programId
+      })
+      .instruction();
 
-    console.log(sig);
+    const tx = new Transaction().add(inst);
+
+    tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash("confirmed")).blockhash;
+    console.log("blockhash:", tx.recentBlockhash);
+    tx.feePayer = p.provider.publicKey;
+
+    try {
+      // ISSUE: Still getting "Blockhash not found" error
+      const sig = await p.provider.sendAndConfirm!(tx, undefined, {
+        maxRetries: 3
+      });
+      console.log(sig);
+    } catch (e) {
+      console.log(e);
+      // @ts-ignore
+      console.log(await e.getLogs());
+    }
+
     puppetData.refetch();
   }, [puppet, puppetData])
 
