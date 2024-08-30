@@ -1,21 +1,27 @@
 "use client";
-
 import { anchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
-import { Keypair, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
 import { useCallback, useState } from "react";
 
+const DEFAULT_PUPPET_ACCOUNT = "EYDtTjPetEpWzqx7MryNNNf5MhTr4QFYFXAJWRQHMaQy"
+
+/**
+ * There are issues with Anchor for using two programs in the same Page.
+ * My guess is that `anchorProvider()` being called twice causes 
+ * blockhash staleness issues.
+ */
 export default function PuppetMasterPage() {
 
-  const [puppet, setPuppet] = useState<Keypair>();
+  const [puppet, setPuppet] = useState<PublicKey>(new PublicKey(DEFAULT_PUPPET_ACCOUNT));
   const puppetData = useQuery({
     queryKey: ["puppet-data"],
     queryFn: async () => {
       if (!puppet) return;
       const p = await puppetProgram();
-      const data = await p.account.data.fetch(puppet.publicKey);
+      const data = await p.account.data.fetch(puppet);
 
       return data;
     }
@@ -31,21 +37,20 @@ export default function PuppetMasterPage() {
 
     console.log(sig);
 
-    setPuppet(puppet);
+    setPuppet(puppet.publicKey);
     puppetData.refetch();
   }, [puppetData])
 
   const setPuppetData = useCallback(async () => {
     if (!puppet) return;
     const p = await puppetMasterProgram();
-    const _puppetProgram = await puppetProgram();
     const inst = await p.methods.pullStrings(
-      new BN(10)
+      new BN(11)
     )
       .accounts({
-        puppet: puppet.publicKey,
+        puppet: puppet,
         // @ts-ignore
-        puppetProgram: _puppetProgram.programId
+        puppetProgram: new PublicKey("5TBggU5sCesWSqkSc44xzKZwhM8FRT4KhTMXK1LoerJG")
       })
       .instruction();
 
@@ -73,7 +78,7 @@ export default function PuppetMasterPage() {
   return <div className="flex flex-col gap-4">
     <h1>Puppet master</h1>
     <p>
-      Puppet: {puppet?.publicKey.toBase58()}
+      Puppet: {puppet.toBase58()}
     </p>
     <p>
       Puppet data: {puppetData.data?.data.toString()}
