@@ -1,5 +1,5 @@
 "use client";
-import { anchorProvider, useAnchorProvider } from "@/lib/util"
+import { anchorProvider, connectAnchorWallet, useAnchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
@@ -60,22 +60,18 @@ export default function PuppetMasterPage() {
       .instruction();
 
     const tx = new Transaction().add(inst);
-
-    tx.recentBlockhash = (await p.provider.connection.getLatestBlockhash("confirmed")).blockhash;
-    console.log("blockhash:", tx.recentBlockhash);
     tx.feePayer = p.provider.publicKey;
+    const blockhash = await p.provider.connection.getLatestBlockhash();
+    console.log(blockhash);
+    tx.recentBlockhash = blockhash.blockhash;
+    tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
 
-    try {
-      // ISSUE: Still getting "Blockhash not found" error
-      const sig = await p.provider.sendAndConfirm!(tx, undefined, {
-        maxRetries: 3
-      });
-      console.log(sig);
-    } catch (e) {
-      console.log(e);
-      // @ts-ignore
-      console.log(await e.getLogs());
-    }
+    const response = await p.provider.connection.simulateTransaction(tx);
+    console.log('Simulation response:', response);
+
+    const sig = await p.provider.sendAndConfirm!(tx);
+    console.log(sig);
+
 
     puppetData.refetch();
   }, [puppet, puppetData, provider])
