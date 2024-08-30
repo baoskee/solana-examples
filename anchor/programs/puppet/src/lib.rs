@@ -23,7 +23,7 @@ pub mod puppet {
 pub struct Initialize<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(init, payer = signer, space = 8 + 8)]
+    #[account(init, payer = signer, space = 8 + Data::INIT_SPACE)]
     pub puppet: Account<'info, Data>,
     pub system_program: Program<'info, System>,
 }
@@ -37,6 +37,7 @@ pub struct SetData<'info> {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct Data {
     pub data: u64,
     pub last_puppeteer: Pubkey,

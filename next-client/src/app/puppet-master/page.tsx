@@ -1,7 +1,7 @@
 "use client";
 import { anchorProvider, connectAnchorWallet, useAnchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
 import { useCallback, useState } from "react";
@@ -35,7 +35,10 @@ export default function PuppetMasterPage() {
     const puppet = new Keypair();
     const p = await puppetProgram(provider);
     const sig = await p.methods.initialize().accounts({
-      puppet: puppet.publicKey
+      signer: provider.publicKey,
+      puppet: puppet.publicKey,
+      // @ts-ignore
+      systemProgram: SystemProgram.programId
     })
       .signers([puppet])
       .rpc();
@@ -49,17 +52,30 @@ export default function PuppetMasterPage() {
   const setPuppetData = useCallback(async () => {
     if (!puppet || !provider) return;
     const p = await puppetMasterProgram(provider);
+
+    const [masterPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("pda"), provider.publicKey.toBuffer()],
+      p.programId
+    )
+    const sysTransferInst = SystemProgram.transfer({
+      fromPubkey: provider.publicKey,
+      toPubkey: masterPda,
+      lamports: 1_000_000_000 // fund PDA with 1 SOL
+    })
+
     const inst = await p.methods.pullStrings(
       new BN(11)
     )
       .accounts({
+        signer: provider.publicKey,
         puppet: puppet,
         // @ts-ignore
+        pdaAccount: masterPda,
         puppetProgram: new PublicKey("5TBggU5sCesWSqkSc44xzKZwhM8FRT4KhTMXK1LoerJG")
       })
       .instruction();
 
-    const tx = new Transaction().add(inst);
+    const tx = new Transaction().add(sysTransferInst, inst);
     tx.feePayer = p.provider.publicKey;
     const blockhash = await p.provider.connection.getLatestBlockhash();
     console.log(blockhash);
