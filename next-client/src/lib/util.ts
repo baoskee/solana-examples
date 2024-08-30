@@ -1,6 +1,8 @@
+"use client"
 import { Wallet } from "@coral-xyz/anchor";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
+import { useEffect, useState } from "react";
 
 export const getProvider = (): SolanaProvider => {
   if ('phantom' in window) {
@@ -60,6 +62,19 @@ export const anchorProvider = async () => {
   const connection = new Connection(LOCAL_RPC_URL);
 
   const provider = new anchor.AnchorProvider(connection, wallet, {});
+  return provider;
+}
+
+export const useAnchorProvider = () => {
+  const [provider, setProvider] = useState<anchor.AnchorProvider | null>(null);
+  useEffect(() => {
+    const init = async () => {
+      const p = await anchorProvider();
+      setProvider(p);
+    }
+    init();
+  }, []);
+
   return provider;
 }
 

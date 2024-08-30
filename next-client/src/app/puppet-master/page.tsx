@@ -1,10 +1,11 @@
 "use client";
-import { anchorProvider } from "@/lib/util"
+import { anchorProvider, useAnchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
 import { useCallback, useState } from "react";
+import * as anchor from "@coral-xyz/anchor";
 
 const DEFAULT_PUPPET_ACCOUNT = "EYDtTjPetEpWzqx7MryNNNf5MhTr4QFYFXAJWRQHMaQy"
 
@@ -16,19 +17,23 @@ const DEFAULT_PUPPET_ACCOUNT = "EYDtTjPetEpWzqx7MryNNNf5MhTr4QFYFXAJWRQHMaQy"
 export default function PuppetMasterPage() {
 
   const [puppet, setPuppet] = useState<PublicKey>(new PublicKey(DEFAULT_PUPPET_ACCOUNT));
+  const provider = useAnchorProvider();
   const puppetData = useQuery({
     queryKey: ["puppet-data"],
     queryFn: async () => {
-      if (!puppet) return;
-      const p = await puppetProgram();
+      if (!puppet || !provider) return;
+      const p = await puppetProgram(provider);
       const data = await p.account.data.fetch(puppet);
 
       return data;
-    }
+    },
+    enabled: !!provider
   })
   const initializePuppet = useCallback(async () => {
+    if (!provider) return;
+
     const puppet = new Keypair();
-    const p = await puppetProgram();
+    const p = await puppetProgram(provider);
     const sig = await p.methods.initialize().accounts({
       puppet: puppet.publicKey
     })
@@ -39,11 +44,11 @@ export default function PuppetMasterPage() {
 
     setPuppet(puppet.publicKey);
     puppetData.refetch();
-  }, [puppetData])
+  }, [puppetData, provider])
 
   const setPuppetData = useCallback(async () => {
-    if (!puppet) return;
-    const p = await puppetMasterProgram();
+    if (!puppet || !provider) return;
+    const p = await puppetMasterProgram(provider);
     const inst = await p.methods.pullStrings(
       new BN(11)
     )
@@ -73,7 +78,7 @@ export default function PuppetMasterPage() {
     }
 
     puppetData.refetch();
-  }, [puppet, puppetData])
+  }, [puppet, puppetData, provider])
 
   return <div className="flex flex-col gap-4">
     <h1>Puppet master</h1>
@@ -92,8 +97,7 @@ export default function PuppetMasterPage() {
   </div>
 }
 
-const puppetMasterProgram = async () => {
-  const provider = await anchorProvider();
+const puppetMasterProgram = async (provider: anchor.AnchorProvider) => {
   return new Program<PuppetMaster>(
     // @ts-ignore
     puppetMasterIDL,
@@ -101,8 +105,7 @@ const puppetMasterProgram = async () => {
   )
 }
 
-const puppetProgram = async () => {
-  const provider = await anchorProvider();
+const puppetProgram = async (provider: anchor.AnchorProvider) => {
   return new Program<Puppet>(
     // @ts-ignore
     puppetIdl,
