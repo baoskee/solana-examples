@@ -13,6 +13,7 @@ pub mod puppet {
 
     pub fn set_data(ctx: Context<SetData>, data: u64) -> Result<()> {
         let puppet = &mut ctx.accounts.puppet;
+        puppet.last_puppeteer = ctx.accounts.signer.key();
         puppet.data = data;
         Ok(())
     }
@@ -30,10 +31,13 @@ pub struct Initialize<'info> {
 #[derive(Accounts)]
 pub struct SetData<'info> {
     #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(mut)]
     pub puppet: Account<'info, Data>,
 }
 
 #[account]
 pub struct Data {
     pub data: u64,
+    pub last_puppeteer: Pubkey,
 }
