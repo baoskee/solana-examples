@@ -1,13 +1,13 @@
 "use client";
-import { anchorProvider, connectAnchorWallet, useAnchorProvider } from "@/lib/util"
+import { anchorProvider, connectAnchorWallet, LOCAL_RPC_URL, useAnchorProvider } from "@/lib/util"
 import { BN, Program } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
 import { useCallback, useState } from "react";
 import * as anchor from "@coral-xyz/anchor";
 
-const DEFAULT_PUPPET_ACCOUNT = "EYDtTjPetEpWzqx7MryNNNf5MhTr4QFYFXAJWRQHMaQy"
+const DEFAULT_PUPPET_ACCOUNT = "ExKU65us4djfMT4Zxy2V5mrN1U4tp8X2vxSRw5Uc8N4M"
 
 /**
  * There are issues with Anchor for using two programs in the same Page.
@@ -77,7 +77,8 @@ export default function PuppetMasterPage() {
 
     const tx = new Transaction().add(sysTransferInst, inst);
     tx.feePayer = p.provider.publicKey;
-    const blockhash = await p.provider.connection.getLatestBlockhash();
+    const conn = new Connection(LOCAL_RPC_URL);
+    const blockhash = await conn.getLatestBlockhash();
     console.log(blockhash);
     tx.recentBlockhash = blockhash.blockhash;
     tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
