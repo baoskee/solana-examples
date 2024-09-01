@@ -89,7 +89,10 @@ export default function PuppetMasterPage() {
     console.log('Simulation response:', response);
     const wallet = await connectAnchorWallet();
     const signed = await wallet.signTransaction(tx);
-    const sig = await conn.sendRawTransaction(signed.serialize());
+    const sig = await conn.sendRawTransaction(signed.serialize(), {
+      // UNCOMMENT THIS LINE GETS BLOCKHASH NOT FOUND ERROR
+      skipPreflight: true
+    });
     console.log(sig);
 
     puppetData.refetch();
