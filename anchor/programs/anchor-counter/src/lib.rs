@@ -44,3 +44,56 @@ pub struct Update<'info> {
 pub struct Counter {
     pub count: u64,
 }
+
+#[cfg(test)]
+mod tests {
+    use anchor_lang::InstructionData;
+    use solana_program_test::*;
+    use solana_sdk::{instruction::Instruction, signer::{keypair::Keypair, Signer}};
+    use crate::{instruction, Counter};
+    use super::*;
+
+    #[tokio::test]
+    async fn test_initialize() {
+        let test = ProgramTest::new("anchor_counter", crate::ID, None);
+        let (mut banks_client, payer, _) = test.start().await;
+
+        let account = Keypair::new();
+        // Create the initialize instruction
+        let ix = instruction::Initialize {
+            data: Some(1),
+        };
+
+        // Build and send the transaction
+        let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
+            &[Instruction::new_with_bytes(
+                crate::ID,
+                &ix.data(),
+                vec![
+                    AccountMeta::new(account.pubkey(), false),
+                    AccountMeta::new(payer.pubkey(), true),
+                    AccountMeta::new_readonly(solana_sdk::system_program::ID, false),
+                ],
+            )],
+            Some(&payer.pubkey()),
+            &[&payer, &account],
+            banks_client.get_latest_blockhash().await.unwrap(),
+        );
+
+        banks_client.process_transaction(tx).await.unwrap();
+
+        // Fetch the created account
+        let counter_account = banks_client
+            .get_account(account.pubkey())
+            .await
+            .expect("Failed to fetch counter account")
+            .expect("Counter account not found");
+
+        // Deserialize the account data
+        let counter_data = Counter::try_deserialize(&mut counter_account.data.as_ref()).unwrap();
+
+        // Check that the counter was initialized to 0
+        assert_eq!(counter_data.count, 1);
+    } 
+
+}
