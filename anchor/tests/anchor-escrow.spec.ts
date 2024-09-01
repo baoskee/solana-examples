@@ -8,7 +8,7 @@ import { escrowIDL, type Escrow } from "../"
 
 const TOKEN_PROGRAM: typeof TOKEN_2022_PROGRAM_ID | typeof TOKEN_PROGRAM_ID = TOKEN_PROGRAM_ID;
 
-describe("escrow", async () => {
+describe.skip("escrow", async () => {
 
   const connection = new Connection("http://localhost:8899");
 

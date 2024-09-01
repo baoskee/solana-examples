@@ -63,6 +63,7 @@ export default function PuppetMasterPage() {
       lamports: 1_000_000_000 // fund PDA with 1 SOL
     })
 
+    console.log(p.provider.connection)
     const inst = await p.methods.pullStrings(
       new BN(11)
     )
@@ -80,15 +81,16 @@ export default function PuppetMasterPage() {
     const conn = new Connection(LOCAL_RPC_URL);
     const blockhash = await conn.getLatestBlockhash();
     console.log(blockhash);
+
     tx.recentBlockhash = blockhash.blockhash;
     tx.lastValidBlockHeight = blockhash.lastValidBlockHeight;
 
     const response = await p.provider.connection.simulateTransaction(tx);
     console.log('Simulation response:', response);
-
-    const sig = await p.provider.sendAndConfirm!(tx);
+    const wallet = await connectAnchorWallet();
+    const signed = await wallet.signTransaction(tx);
+    const sig = await conn.sendRawTransaction(signed.serialize());
     console.log(sig);
-
 
     puppetData.refetch();
   }, [puppet, puppetData, provider])
