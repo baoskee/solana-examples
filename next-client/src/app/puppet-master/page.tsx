@@ -4,10 +4,10 @@ import { BN, Program } from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useQuery } from "@tanstack/react-query";
 import { Puppet, puppetIdl, PuppetMaster, puppetMasterIDL } from "anchor-local";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as anchor from "@coral-xyz/anchor";
 
-const DEFAULT_PUPPET_ACCOUNT = "ExKU65us4djfMT4Zxy2V5mrN1U4tp8X2vxSRw5Uc8N4M"
+const DEFAULT_PUPPET_ACCOUNT = "FvaTJH9mHVjk6u4q8Pbyde1rPa5EARq5W29RbV8GNgaL"
 
 /**
  * There are issues with Anchor for using two programs in the same Page.
@@ -49,6 +49,20 @@ export default function PuppetMasterPage() {
     puppetData.refetch();
   }, [puppetData, provider])
 
+  const [masterPda, setMasterPda] = useState<PublicKey>();
+  useEffect(() => {
+    if (!provider) return;
+    (async () => {
+      const p = await puppetMasterProgram(provider);
+      const [masterPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("pda"), provider.publicKey.toBuffer()],
+        p.programId
+      )
+      setMasterPda(masterPda);
+    })()
+  }, [provider])
+
+
   const setPuppetData = useCallback(async () => {
     if (!puppet || !provider) return;
     const p = await puppetMasterProgram(provider);
@@ -63,7 +77,6 @@ export default function PuppetMasterPage() {
       lamports: 1_000_000_000 // fund PDA with 1 SOL
     })
 
-    console.log(p.provider.connection)
     const inst = await p.methods.pullStrings(
       new BN(11)
     )
@@ -104,7 +117,13 @@ export default function PuppetMasterPage() {
       Puppet: {puppet.toBase58()}
     </p>
     <p>
-      Puppet data: {puppetData.data?.data.toString()}
+      PDA: {masterPda?.toBase58()}
+    </p>
+    <p>
+      Puppet data: 
+      <pre>
+        {JSON.stringify(puppetData.data, null, 2)}
+      </pre>
     </p>
     <button onClick={initializePuppet}>
       Initialize puppet

@@ -13,6 +13,8 @@ pub mod puppet {
 
     pub fn set_data(ctx: Context<SetData>, data: u64) -> Result<()> {
         let puppet = &mut ctx.accounts.puppet;
+        msg!("pda signer: {:?}", ctx.accounts.signer.to_account_info());
+
         puppet.last_puppeteer = ctx.accounts.signer.key();
         puppet.data = data;
         Ok(())
