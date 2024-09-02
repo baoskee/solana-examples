@@ -60,7 +60,6 @@ describe("anchor-counter", () => {
           executable: false,
           lamports: 10000000000,
           owner: programId,
-          rentEpoch: 18446744073709552000
         }
       }
     ]);
