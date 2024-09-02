@@ -6,16 +6,16 @@ skip-lint = false
 
 [programs.localnet]
 anchor_counter = "8sbbinVKBHTxWBd1oDrjUnHY9GqB2QJJq4YeUdPnnVM6"
-cpi-signer = "ANoX6SiPRLWY4SXVtLvfmpSG5Qg5bkAA9jS8e2XcmGTS"
+cpi_signer = "FxhAgWhnKhghCtTF2c6fPxo1LKueHTuypjTR6fSejJXS"
 escrow = "3VXioM77xHLhNycAN4pkpHAsp6hZyDxnSieKQd7Kyt8r"
-pubkey-arg = "2hAqft8LyeYA6KZhptCjhLCLepdukDk8rk1TBAoAkDk2"
+pubkey_arg = "CszGbucGUE2H5gwuGZQNmAJ1Qe1uHmst36ZmxP4Z4yvy"
 puppet = "5TBggU5sCesWSqkSc44xzKZwhM8FRT4KhTMXK1LoerJG"
-puppet-master = "F4YurBauRjWpHpynNZhARWezDoDc2wLCWTjoihe338Ck"
-reviews-variable-len = "LRxvkSm156Rk7CBss2vrYdBPXDnKXmJzgnjuYYtGZ1L"
-smart-wallet = "BKhDWiNiM9ZEo3Deyf7MmfDMyDYwLeGLagorJ5GtV8XC"
-spl-demo = "2AvdcjV1eA45F98Uo1iN6CDG8QThTUPi7Rmn6nHSCET6"
-token-2022 = "QJqxGatfoyyHgeuxNgur5EWETdXGzYx2hBkdtrbT2gZ"
-virtual-xyk = "AxqJANBzF2LxPQDh33jVSRut8Tsnq5Ag5iDwVg7st9CN"
+puppet_master = "F4YurBauRjWpHpynNZhARWezDoDc2wLCWTjoihe338Ck"
+reviews_variable_len = "3M8LR1Ss2m49AKCZnUUndUthtJGwHxiA1W25N8aJj3vf"
+smart_wallet = "12ojTiLE1QzfpucQd9rfiibrhqTRXQ3jMbUnGN5BzA3a"
+spl_demo = "6v1TvN4fWHEAbJmphQaAE28ihkgUPijiFyY6sHysvDU5"
+token_2022 = "QJqxGatfoyyHgeuxNgur5EWETdXGzYx2hBkdtrbT2gZ"
+virtual_xyk = "AxqJANBzF2LxPQDh33jVSRut8Tsnq5Ag5iDwVg7st9CN"
 
 [registry]
 url = "https://api.apr.dev"

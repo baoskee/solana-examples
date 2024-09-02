@@ -4,7 +4,7 @@ import { Connection, PublicKey, SystemProgram, Transaction, TransactionInstructi
 import { confirmTransaction, makeKeypairs } from "@solana-developers/helpers";
 import { createAssociatedTokenAccountIdempotentInstruction, createInitializeMint2Instruction, createMintToInstruction, getAssociatedTokenAddressSync, getMinimumBalanceForRentExemptMint, MINT_SIZE, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { randomBytes } from "crypto"
-import { escrowIDL, type Escrow } from "../"
+import { escrowIDL, type Escrow } from ".."
 
 const TOKEN_PROGRAM: typeof TOKEN_2022_PROGRAM_ID | typeof TOKEN_PROGRAM_ID = TOKEN_PROGRAM_ID;
 
