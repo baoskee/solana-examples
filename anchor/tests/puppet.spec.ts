@@ -5,31 +5,27 @@ import { Puppet } from '../target/types/puppet'
 import { PuppetMaster } from '../target/types/puppet_master'
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest'
 import { confirmTransaction } from '@solana-developers/helpers'
+import { BankrunProvider } from 'anchor-bankrun'
+import { startAnchor } from 'solana-bankrun'
+import { puppetIdl, puppetMasterIDL } from '..'
 
-describe.only('puppet', () => {
-  const connection = new Connection("http://localhost:8899");
-  const alice = new Keypair();
-  const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(alice));
-  anchor.setProvider(provider)
-
-  beforeAll(async () => {
-    // Request airdrop for Alice
-    const airdropSignature = await connection.requestAirdrop(
-      alice.publicKey,
-      2_000 * anchor.web3.LAMPORTS_PER_SOL
-    );
-
-    // Confirm the airdrop transaction
-    await connection.confirmTransaction(airdropSignature);
-    console.log('Airdropped 2_000 SOL to Alice')
-  }, 100_000)
-
-  const puppetProgram = anchor.workspace.Puppet as Program<Puppet>
-  const puppetMasterProgram = anchor.workspace
-    .PuppetMaster as Program<PuppetMaster>
-  const puppetKeypair = Keypair.generate()
-
+describe('puppet', () => {
   it('Does CPI!', async () => {
+
+    const ctx = await startAnchor(".", [], []);
+    const provider = new BankrunProvider(ctx);
+    const puppetProgram = new Program<Puppet>(
+      // @ts-ignore
+      puppetIdl,
+      provider
+    )
+    const puppetMasterProgram = new Program<PuppetMaster>(
+      // @ts-ignore
+      puppetMasterIDL,
+      provider
+    );
+    const puppetKeypair = Keypair.generate()
+
     const res = await puppetProgram.methods
       .initialize()
       .accounts({
@@ -39,8 +35,8 @@ describe.only('puppet', () => {
         systemProgram: SystemProgram.programId,
       })
       .signers([puppetKeypair])
-      .rpc()
-    
+      .rpc({ commitment: "processed" })
+
     console.log('Puppet initialized!', res)
     const [pdaAccount] = PublicKey.findProgramAddressSync(
       [Buffer.from('pda'), provider.wallet.publicKey.toBuffer()],
@@ -53,10 +49,10 @@ describe.only('puppet', () => {
         signer: provider.wallet.publicKey,
         puppet: puppetKeypair.publicKey,
         // @ts-ignore
-        pdaAccount, 
+        pdaAccount,
         puppetProgram: puppetProgram.programId,
       })
-      .rpc()
+      .rpc({ commitment: "processed" })
 
     console.log('Puppet pulled!', res)
 

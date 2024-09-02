@@ -9,8 +9,7 @@ import { Keypair } from "@solana/web3.js";
 
 describe("anchor-counter", () => {
 
-  it.only("bankrun example", async () => {
-    console.log("starting bankrun");
+  it("bankrun example", async () => {
     const ctx = await startAnchor(".", [], []);
     const provider = new BankrunProvider(ctx);
 
